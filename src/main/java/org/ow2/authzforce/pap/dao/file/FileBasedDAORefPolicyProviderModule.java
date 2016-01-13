@@ -45,6 +45,7 @@ import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluator;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicySetEvaluator;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
+import org.ow2.authzforce.pap.dao.file.xmlns.StaticFileBasedDAORefPolicyProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.ResourceUtils;
