@@ -39,12 +39,12 @@
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>${artifactId.prefix}-core-pap-api</artifactId>
-			<version>3.6.0-SNAPSHOT</version>
+			<version>3.6.0</version>
 		</dependency>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>${artifactId.prefix}-core</artifactId>
-			<version>3.6.1-SNAPSHOT</version>
+			<version>3.7.0</version>
 		</dependency>
 	</dependencies>
 	<build>
@@ -74,8 +74,6 @@
 						<episode>
 							<groupId>${project.groupId}</groupId>
 							<artifactId>${artifactId.prefix}-pdp-ext-model</artifactId>
-							<!-- version removed when removing SNAPSHOT -->
-							<version>3.3.7-SNAPSHOT</version>
 						</episode>
 					</episodes>
 					<catalog>src/main/jaxb/catalog.xml</catalog>
