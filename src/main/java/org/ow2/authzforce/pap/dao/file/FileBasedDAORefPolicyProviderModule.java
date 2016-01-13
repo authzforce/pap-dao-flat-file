@@ -104,6 +104,22 @@ public final class FileBasedDAORefPolicyProviderModule implements RefPolicyProvi
 		return new SimpleImmutableEntry<>(policyParentDirectory, suffix);
 	}
 
+	private static final class SuffixMatchingFileFilter implements FileFilter
+	{
+		private final String suffix;
+
+		private SuffixMatchingFileFilter(String suffix)
+		{
+			this.suffix = suffix;
+		}
+
+		@Override
+		public boolean accept(File file)
+		{
+			return file.isFile() && file.canRead() && file.getName().endsWith(suffix);
+		}
+	}
+
 	/**
 	 * Module factory
 	 *
@@ -241,17 +257,7 @@ public final class FileBasedDAORefPolicyProviderModule implements RefPolicyProvi
 
 		FileBasedDAOUtils.checkFile("RefPolicyProvider's policy directory", policyParentDirectory, true, false);
 		this.policyParentDirectory = policyParentDirectory;
-		this.filenameFilter = new FileFilter()
-		{
-
-			@Override
-			public boolean accept(File file)
-			{
-				return file.isFile() && file.canRead() && file.getName().endsWith(suffix);
-			}
-
-		};
-
+		this.filenameFilter = new SuffixMatchingFileFilter(suffix);
 		this.policyFilenameSuffixLength = suffix.length();
 		this.xacmlParserFactory = xacmlParserFactory;
 		this.expressionFactory = expressionFactory;
