@@ -45,7 +45,6 @@ import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluator;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicySetEvaluator;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
-import org.ow2.authzforce.pap.dao.file.xmlns.StaticFileBasedDAORefPolicyProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.ResourceUtils;
@@ -102,6 +101,22 @@ public final class FileBasedDAORefPolicyProviderModule implements RefPolicyProvi
 
 		final String suffix = policyLocationPattern.substring(index + 2);
 		return new SimpleImmutableEntry<>(policyParentDirectory, suffix);
+	}
+
+	private static final class SuffixMatchingFileFilter implements FileFilter
+	{
+		private final String suffix;
+
+		private SuffixMatchingFileFilter(String suffix)
+		{
+			this.suffix = suffix;
+		}
+
+		@Override
+		public boolean accept(File file)
+		{
+			return file.isFile() && file.canRead() && file.getName().endsWith(suffix);
+		}
 	}
 
 	/**
@@ -241,17 +256,7 @@ public final class FileBasedDAORefPolicyProviderModule implements RefPolicyProvi
 
 		FileBasedDAOUtils.checkFile("RefPolicyProvider's policy directory", policyParentDirectory, true, false);
 		this.policyParentDirectory = policyParentDirectory;
-		this.filenameFilter = new FileFilter()
-		{
-
-			@Override
-			public boolean accept(File file)
-			{
-				return file.isFile() && file.canRead() && file.getName().endsWith(suffix);
-			}
-
-		};
-
+		this.filenameFilter = new SuffixMatchingFileFilter(suffix);
 		this.policyFilenameSuffixLength = suffix.length();
 		this.xacmlParserFactory = xacmlParserFactory;
 		this.expressionFactory = expressionFactory;
