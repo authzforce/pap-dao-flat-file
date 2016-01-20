@@ -932,7 +932,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 					}
 					
 					// the request to remove the policy is not legit (PDP needs it)
-					throw new IllegalArgumentException("Policy '" + policyId + "' cannot be removed because it is still used as root policy, or referenced directly/indirectly by the root policy", e);
+					throw new IllegalArgumentException("Policy '" + policyId + "' cannot be removed because it is still used as root policy, or referenced directly/indirectly by the root policy. Removing this policy would cause the following PDP loading error", e);
 				}
 			}
 			return versions;
