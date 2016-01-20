@@ -908,7 +908,9 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 			synchronized (domainDir)
 			{
-				// Reload PDP without the policy (directory)
+				/*
+				 * Try reload PDP without the policy (directory) to see if it can be removed safely, i.e. it is no longer used/required
+				 */
 				final File tmpBackupFile = new File(domainDir, policyDir.getName() + FILE_BACKUP_SUFFIX);
 				if (!policyDir.renameTo(tmpBackupFile))
 				{
@@ -928,7 +930,9 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 						throw new IOException("Error restoring policy file from backup after failed removal (causing PDP instantiation failure): "
 								+ tmpBackupFile + " -> " + policyDir);
 					}
-					throw e;
+					
+					// the request to remove the policy is not legit (PDP needs it)
+					throw new IllegalArgumentException("Policy '" + policyId + "' cannot be removed because it is still used as root policy, or referenced directly/indirectly by the root policy. Removing this policy would cause the following PDP loading error", e);
 				}
 			}
 			return versions;

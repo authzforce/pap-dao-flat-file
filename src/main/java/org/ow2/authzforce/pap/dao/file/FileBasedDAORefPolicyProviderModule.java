@@ -322,7 +322,15 @@ public final class FileBasedDAORefPolicyProviderModule implements RefPolicyProvi
 		}
 
 		final int refChainLenBefore = newPolicyRefChain.size();
-		final PolicySetEvaluator policyEvaluator = policyEntry.getValue().getEvaluator(newPolicyRefChain);
+		final PolicySetEvaluator policyEvaluator;
+		try {
+		 policyEvaluator = policyEntry.getValue().getEvaluator(newPolicyRefChain);
+		} catch(IndeterminateEvaluationException e) {
+			// throw back an high-level exception message for easier troubleshooting (no file path) 
+			final PolicyVersion version = policyEntry.getKey();
+			throw new IndeterminateEvaluationException("Matched policy '"+id+"' (version "+version+") is invalid or its content is unavailable", StatusHelper.STATUS_PROCESSING_ERROR, e);
+		}
+		
 		final List<String> resultPolicyLongestRefChain = policyEvaluator.getLongestPolicyReferenceChain();
 		/*
 		 * If there is a longest ref chain in result policy, but newPolicyRefChain was not updated with it (length unchanged, i.e. same as before the get(...)),
