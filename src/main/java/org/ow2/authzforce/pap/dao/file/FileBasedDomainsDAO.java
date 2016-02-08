@@ -98,8 +98,6 @@ import com.fasterxml.uuid.EthernetAddress;
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedGenerator;
 
-// import com.google.common.io.BaseEncoding;
-
 /**
  * Filesystem-based policy domain repository DAO
  * 
@@ -117,7 +115,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		implements DomainsDAO<DOMAIN_DAO_CLIENT>
 {
 
-	private static class ReadableDomainPropertiesImpl implements ReadableDomainProperties
+	private static class ReadableDomainPropertiesImpl implements
+			ReadableDomainProperties
 	{
 
 		private final String domainId;
@@ -125,7 +124,9 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		private final String description;
 		private final String externalId;
 
-		private ReadableDomainPropertiesImpl(String domainId, String description, String externalId, IdReferenceType rootPolicyRef)
+		private ReadableDomainPropertiesImpl(String domainId,
+				String description, String externalId,
+				IdReferenceType rootPolicyRef)
 		{
 			assert domainId != null;
 			assert rootPolicyRef != null;
@@ -165,14 +166,22 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	private static final IllegalArgumentException ILLEGAL_CONSTRUCTOR_ARGS_EXCEPTION = new IllegalArgumentException(
 			"One of the following FileBasedDomainsDAO constructor arguments is undefined although required: domainsRoot == null || domainTmpl == null || schema == null || pdpModelHandler == null || domainDAOClientFactory == null || policyDAOClientFactory == null");
 
-	private static final IllegalArgumentException NULL_DOMAIN_ID_ARG_EXCEPTION = new IllegalArgumentException("Undefined domain ID arg");
+	private static final IllegalArgumentException NULL_DOMAIN_ID_ARG_EXCEPTION = new IllegalArgumentException(
+			"Undefined domain ID arg");
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(FileBasedDomainsDAO.class);
+	private static final IllegalArgumentException ILLEGAL_POLICY_NOT_STATIC_EXCEPTION = new IllegalArgumentException(
+			"One of the policy finders in the domain PDP configuration is not static, or one of the policies required by PDP cannot be statically resolved");
 
-	private static final IllegalArgumentException NULL_POLICY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null policySet arg");
+	private static final Logger LOGGER = LoggerFactory
+			.getLogger(FileBasedDomainsDAO.class);
+
+	private static final IllegalArgumentException NULL_POLICY_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"Null policySet arg");
 	private static final TreeSet<PolicyVersion> EMPTY_TREE_SET = new TreeSet<>();
-	private static final IllegalArgumentException NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain properties arg");
-	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null attributeProviders arg");
+	private static final IllegalArgumentException NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"Null domain properties arg");
+	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"Null attributeProviders arg");
 
 	/**
 	 * Domain properties XSD location
@@ -194,33 +203,40 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	 */
 	public static final String FILE_BACKUP_SUFFIX = ".old";
 
-	// private static final Logger LOGGER = LoggerFactory.getLogger(SecurityDomain.class);
+	// private static final Logger LOGGER =
+	// LoggerFactory.getLogger(SecurityDomain.class);
 
 	private static final JAXBContext DOMAIN_PROPERTIES_JAXB_CONTEXT;
 	static
 	{
 		try
 		{
-			DOMAIN_PROPERTIES_JAXB_CONTEXT = JAXBContext.newInstance(DomainProperties.class);
+			DOMAIN_PROPERTIES_JAXB_CONTEXT = JAXBContext
+					.newInstance(DomainProperties.class);
 		} catch (JAXBException e)
 		{
-			throw new RuntimeException("Error creating JAXB context for (un)marshalling domain properties (XML)", e);
+			throw new RuntimeException(
+					"Error creating JAXB context for (un)marshalling domain properties (XML)",
+					e);
 		}
 	}
 
 	private static final Schema DOMAIN_PROPERTIES_SCHEMA;
 	static
 	{
-		final SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+		final SchemaFactory schemaFactory = SchemaFactory
+				.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
 		try
 		{
-			DOMAIN_PROPERTIES_SCHEMA = schemaFactory.newSchema(ResourceUtils.getURL(DOMAIN_PROPERTIES_XSD_LOCATION));
+			DOMAIN_PROPERTIES_SCHEMA = schemaFactory.newSchema(ResourceUtils
+					.getURL(DOMAIN_PROPERTIES_XSD_LOCATION));
 		} catch (FileNotFoundException e)
 		{
 			throw new RuntimeException("Domain properties schema not found", e);
 		} catch (SAXException e)
 		{
-			throw new RuntimeException("Invalid domain properties schema file", e);
+			throw new RuntimeException("Invalid domain properties schema file",
+					e);
 		}
 	}
 
@@ -238,18 +254,28 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	private final TimeBasedGenerator uuidGen;
 
 	/**
-	 * Initializes a UUID generator that generates UUID version 1. It is thread-safe and uses the host MAC address as the node field if
-	 * useRandomAddressBasedUUID = false, in which case UUID uniqueness across multiple hosts (e.g. in a High-Availability architecture) is guaranteed. If this
-	 * is used by multiple hosts to generate UUID for common objects (e.g. in a High Availability architecture), it is critical that clocks of all hosts be
-	 * synchronized (e.g. with a common NTP server). If no MAC address is available, e.g. no network connection, set useRandomAddressBasedUUID = true to use a
-	 * random multicast address instead as node field.
+	 * Initializes a UUID generator that generates UUID version 1. It is
+	 * thread-safe and uses the host MAC address as the node field if
+	 * useRandomAddressBasedUUID = false, in which case UUID uniqueness across
+	 * multiple hosts (e.g. in a High-Availability architecture) is guaranteed.
+	 * If this is used by multiple hosts to generate UUID for common objects
+	 * (e.g. in a High Availability architecture), it is critical that clocks of
+	 * all hosts be synchronized (e.g. with a common NTP server). If no MAC
+	 * address is available, e.g. no network connection, set
+	 * useRandomAddressBasedUUID = true to use a random multicast address
+	 * instead as node field.
 	 * 
-	 * @see <a href="http://www.cowtowncoder.com/blog/archives/2010/10/entry_429.html">More on Java UUID Generator (JUG), a word on performance</a>
-	 * @see <a href="http://johannburkard.de/blog/programming/java/Java-UUID-generators-compared.html">Java UUID generators compared</a>
+	 * @see <a
+	 *      href="http://www.cowtowncoder.com/blog/archives/2010/10/entry_429.html">More
+	 *      on Java UUID Generator (JUG), a word on performance</a>
+	 * @see <a
+	 *      href="http://johannburkard.de/blog/programming/java/Java-UUID-generators-compared.html">Java
+	 *      UUID generators compared</a>
 	 * 
 	 * @return UUID v1
 	 */
-	private static TimeBasedGenerator initUUIDGenerator(boolean useRandomAddressBasedUUID)
+	private static TimeBasedGenerator initUUIDGenerator(
+			boolean useRandomAddressBasedUUID)
 	{
 
 		final EthernetAddress macAddress;
@@ -303,11 +329,15 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 	private final TooManyPoliciesException maxNumOfVersionsReachedException;
 
-	private ReadableDomainProperties removeDomainFromMapsAfterDirectoryDeleted(ReadableDomainProperties domainProps) throws IOException
+	private final boolean removeOldestVersionsIfMaxExceeded;
+
+	private ReadableDomainProperties removeDomainFromMapsAfterDirectoryDeleted(
+			ReadableDomainProperties domainProps) throws IOException
 	{
 		assert domainProps.getInternalId() != null;
 
-		final DOMAIN_DAO_CLIENT domainDAOClient = domainMap.remove(domainProps.getInternalId());
+		final DOMAIN_DAO_CLIENT domainDAOClient = domainMap.remove(domainProps
+				.getInternalId());
 		if (domainDAOClient == null)
 		{
 			return null;
@@ -322,7 +352,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		return domainProps;
 	}
 
-	private final class FileBasedDomainDAOImpl implements FileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>
+	private final class FileBasedDomainDAOImpl implements
+			FileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>
 	{
 
 		private final String domainId;
@@ -342,7 +373,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			@Override
 			public boolean accept(File file)
 			{
-				return file.isFile() && file.getName().endsWith(policyFilenameSuffix);
+				return file.isFile()
+						&& file.getName().endsWith(policyFilenameSuffix);
 			}
 		};
 
@@ -350,60 +382,83 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 		private final DefaultEnvironmentProperties pdpConfEnvProps;
 
+		private final ConcurrentHashMap<String, NavigableSet<PolicyVersion>> versionsByPolicyId = new ConcurrentHashMap<>();
+
 		/**
 		 * Constructs end-user policy admin domain
 		 * 
 		 * @param domainDir
 		 *            domain directory
 		 * @param jaxbCtx
-		 *            JAXB context for marshalling/unmarshalling configuration data
+		 *            JAXB context for marshalling/unmarshalling configuration
+		 *            data
 		 * @param confSchema
 		 *            domain's XML configuration schema
 		 * @param pdpModelHandler
 		 *            PDP configuration model handler
 		 * @param domainMapEntry
-		 *            proxy to entry in domains map where all domains are registry (e.g. to self-remove from the map)
+		 *            proxy to entry in domains map where all domains are
+		 *            registry (e.g. to self-remove from the map)
 		 * @param props
-		 *            new domain properties for new domain creation, null if no specific properties (use default properties)
+		 *            new domain properties for new domain creation, null if no
+		 *            specific properties (use default properties)
 		 * @throws IllegalArgumentException
 		 *             Invalid configuration files in {@code domainDir}
 		 * @throws IOException
-		 *             Error loading configuration file(s) from or persisting {@code props} (if not null) to {@code domainDir}
+		 *             Error loading configuration file(s) from or persisting
+		 *             {@code props} (if not null) to {@code domainDir}
 		 */
-		private FileBasedDomainDAOImpl(File domainDir, WritableDomainProperties props) throws IOException
+		private FileBasedDomainDAOImpl(File domainDir,
+				WritableDomainProperties props) throws IOException
 		{
 			assert domainDir != null;
 
 			this.domainId = domainDir.getName();
 
 			// domainDir
-			FileBasedDAOUtils.checkFile("Domain directory", domainDir, true, true);
+			FileBasedDAOUtils.checkFile("Domain directory", domainDir, true,
+					true);
 			this.domainDir = domainDir;
 
-			// PDP configuration parser environment properties, e.g. PARENT_DIR for replacement in configuration strings
-			this.pdpConfEnvProps = new DefaultEnvironmentProperties(Collections.singletonMap(EnvironmentPropertyName.PARENT_DIR, domainDir.toURI().toString()));
+			// PDP configuration parser environment properties, e.g. PARENT_DIR
+			// for replacement in configuration strings
+			this.pdpConfEnvProps = new DefaultEnvironmentProperties(
+					Collections.singletonMap(
+							EnvironmentPropertyName.PARENT_DIR, domainDir
+									.toURI().toString()));
 
 			// PDP config file
 			this.pdpConfFile = new File(domainDir, DOMAIN_PDP_CONFIG_FILENAME);
 
-			// Get policy directory from PDP conf (refPolicyProvider/policyLocation pattern)
+			// Get policy directory from PDP conf
+			// (refPolicyProvider/policyLocation pattern)
 			final Pdp pdpConf = getPDPConfTmpl();
 
-			// Get the refpolicies parent directory and suffix from PDP conf (refPolicyProvider)
-			final AbstractPolicyProvider refPolicyProvider = pdpConf.getRefPolicyProvider();
+			// Get the refpolicies parent directory and suffix from PDP conf
+			// (refPolicyProvider)
+			final AbstractPolicyProvider refPolicyProvider = pdpConf
+					.getRefPolicyProvider();
 			if (!(refPolicyProvider instanceof StaticFileBasedDAORefPolicyProvider))
 			{
 				// critical error
-				throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "' in file '" + pdpConfFile
-						+ "': refPolicyProvider is not an instance of " + StaticFileBasedDAORefPolicyProvider.class + " as expected.");
+				throw new RuntimeException(
+						"Invalid PDP configuration of domain '" + domainId
+								+ "' in file '" + pdpConfFile
+								+ "': refPolicyProvider is not an instance of "
+								+ StaticFileBasedDAORefPolicyProvider.class
+								+ " as expected.");
 			}
 
 			final StaticFileBasedDAORefPolicyProvider fileBasedRefPolicyProvider = (StaticFileBasedDAORefPolicyProvider) refPolicyProvider;
 			// replace any ${PARENT_DIR} placeholder in policy location pattern
-			final String policyLocation = pdpConfEnvProps.replacePlaceholders(fileBasedRefPolicyProvider.getPolicyLocationPattern());
-			final Entry<File, String> result = FileBasedDAORefPolicyProviderModule.validateConf(policyLocation);
+			final String policyLocation = pdpConfEnvProps
+					.replacePlaceholders(fileBasedRefPolicyProvider
+							.getPolicyLocationPattern());
+			final Entry<File, String> result = FileBasedDAORefPolicyProviderModule
+					.validateConf(policyLocation);
 			this.policyParentDirectory = result.getKey();
-			FileBasedDAOUtils.checkFile("Domain policies directory", policyParentDirectory, true, true);
+			FileBasedDAOUtils.checkFile("Domain policies directory",
+					policyParentDirectory, true, true);
 
 			this.policyFilenameSuffix = result.getValue();
 
@@ -412,7 +467,9 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			if (props != null)
 			{
 				// set/save properties and update PDP
-				setDomainProperties(props.getDescription(), props.getExternalId(), props.getRootPolicyRef(), pdpConf);
+				setDomainProperties(props.getDescription(),
+						props.getExternalId(), props.getRootPolicyRef(),
+						pdpConf);
 			} else
 			{
 				// just load the PDP from the files
@@ -423,9 +480,11 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		@Override
 		public void reloadPDP() throws IOException, IllegalArgumentException
 		{
-			FileBasedDAOUtils.checkFile("Domain PDP configuration file", pdpConfFile, false, true);
+			FileBasedDAOUtils.checkFile("Domain PDP configuration file",
+					pdpConfFile, false, true);
 			// test if PDP conf valid, and update the domain's PDP only if valid
-			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfFile, pdpModelHandler);
+			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfFile,
+					pdpModelHandler);
 			// did not throw exception, so valid
 			// update the domain's PDP
 			if (pdp != null)
@@ -434,20 +493,34 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 
 			pdp = newPDP;
+
+			// Check that all policies used by PDP are statically resolved
+			// Indeed, dynamic policy resolution is not supported by this PAP
+			// DAO implementation
+			final Map<String, PolicyVersion> staticPoliciesById = pdp
+					.getStaticRootAndRefPolicies();
+			if (staticPoliciesById == null)
+			{
+				throw ILLEGAL_POLICY_NOT_STATIC_EXCEPTION;
+			}
 		}
 
 		/**
 		 * 
 		 * @param pdpConfTemplate
-		 *            original PDP configuration template from file, i.e. before any replacement of property placeholders like ${PARENT_DIR}; saved/marshalled
-		 *            to file PDP update succeeds
+		 *            original PDP configuration template from file, i.e. before
+		 *            any replacement of property placeholders like
+		 *            ${PARENT_DIR}; saved/marshalled to file PDP update
+		 *            succeeds
 		 * @throws IllegalArgumentException
 		 * @throws IOException
 		 */
-		private void updatePDP(Pdp pdpConfTmpl) throws IllegalArgumentException, IOException
+		private void updatePDP(Pdp pdpConfTmpl)
+				throws IllegalArgumentException, IOException
 		{
 			// test if PDP conf valid, and update the domain's PDP only if valid
-			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfTmpl, pdpConfEnvProps);
+			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfTmpl,
+					pdpConfEnvProps);
 			// did not throw exception, so valid
 			// Commit/save the new PDP conf
 			try
@@ -455,8 +528,11 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				pdpModelHandler.marshal(pdpConfTmpl, pdpConfFile);
 			} catch (JAXBException e)
 			{
-				// critical error: we should not end up with an invalid PDP configuration file, so we consider an I/O error
-				throw new IOException("Error writing new PDP configuration of domain '" + domainId + "'", e);
+				// critical error: we should not end up with an invalid PDP
+				// configuration file, so we consider an I/O error
+				throw new IOException(
+						"Error writing new PDP configuration of domain '"
+								+ domainId + "'", e);
 			}
 
 			// update the domain's PDP
@@ -468,30 +544,41 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			pdp = newPDP;
 		}
 
-		private void setProperties(String description, String externalId) throws IOException
+		private void setProperties(String description, String externalId)
+				throws IOException
 		{
 			final Marshaller marshaller;
 			try
 			{
 				marshaller = DOMAIN_PROPERTIES_JAXB_CONTEXT.createMarshaller();
-				marshaller.setProperty(Marshaller.JAXB_ENCODING, StandardCharsets.UTF_8.name());
+				marshaller.setProperty(Marshaller.JAXB_ENCODING,
+						StandardCharsets.UTF_8.name());
 			} catch (JAXBException e)
 			{
 				// critical error
-				throw new RuntimeException("Error creating JAXB unmarshaller for domain properties (XML)", e);
+				throw new RuntimeException(
+						"Error creating JAXB unmarshaller for domain properties (XML)",
+						e);
 			}
 
 			marshaller.setSchema(DOMAIN_PROPERTIES_SCHEMA);
 			try
 			{
 				/*
-				 * The rootPolicyRef is in another file (PDP configuration file). We cannot marshall more generic ManagedResourceProperties because it does not
-				 * have @XmlRootElement
+				 * The rootPolicyRef is in another file (PDP configuration
+				 * file). We cannot marshall more generic
+				 * ManagedResourceProperties because it does not have
+				 * 
+				 * @XmlRootElement
 				 */
-				marshaller.marshal(new DomainProperties(description, externalId), propFile);
+				marshaller
+						.marshal(new DomainProperties(description, externalId),
+								propFile);
 			} catch (JAXBException e)
 			{
-				throw new IOException("Error persisting properties (XML) of domain '" + domainId + "'", e);
+				throw new IOException(
+						"Error persisting properties (XML) of domain '"
+								+ domainId + "'", e);
 			}
 		}
 
@@ -500,59 +587,82 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			final Unmarshaller unmarshaller;
 			try
 			{
-				unmarshaller = DOMAIN_PROPERTIES_JAXB_CONTEXT.createUnmarshaller();
+				unmarshaller = DOMAIN_PROPERTIES_JAXB_CONTEXT
+						.createUnmarshaller();
 			} catch (JAXBException e)
 			{
 				// critical error
-				throw new RuntimeException("Error creating JAXB unmarshaller for domain properties (XML)", e);
+				throw new RuntimeException(
+						"Error creating JAXB unmarshaller for domain properties (XML)",
+						e);
 			}
 
 			unmarshaller.setSchema(DOMAIN_PROPERTIES_SCHEMA);
 			final JAXBElement<DomainProperties> jaxbElt;
 			try
 			{
-				jaxbElt = unmarshaller.unmarshal(new StreamSource(propFile), DomainProperties.class);
+				jaxbElt = unmarshaller.unmarshal(new StreamSource(propFile),
+						DomainProperties.class);
 			} catch (JAXBException e)
 			{
-				throw new IOException("Error getting properties (XML) of domain '" + domainId + "'", e);
+				throw new IOException(
+						"Error getting properties (XML) of domain '" + domainId
+								+ "'", e);
 			}
 
 			return jaxbElt.getValue();
 		}
 
 		/**
-		 * Gets original PDP configuration template from file, before any replacement of property placeholders like ${PARENT_DIR}
+		 * Gets original PDP configuration template from file, before any
+		 * replacement of property placeholders like ${PARENT_DIR}
 		 * 
-		 * @return original PDP configuration from file (no property like PARENT_DIR replaced in the process)
+		 * @return original PDP configuration from file (no property like
+		 *         PARENT_DIR replaced in the process)
 		 * @throws IOException
 		 */
 		private Pdp getPDPConfTmpl() throws IOException
 		{
 			try
 			{
-				return pdpModelHandler.unmarshal(new StreamSource(pdpConfFile), Pdp.class);
+				return pdpModelHandler.unmarshal(new StreamSource(pdpConfFile),
+						Pdp.class);
 			} catch (JAXBException e)
 			{
-				// critical error: we should not end up with an invalid PDP configuration file, so we consider an I/O error
-				throw new IOException("Error reading PDP configuration of domain '" + domainId + "'", e);
+				// critical error: we should not end up with an invalid PDP
+				// configuration file, so we consider an I/O error
+				throw new IOException(
+						"Error reading PDP configuration of domain '"
+								+ domainId + "'", e);
 			}
 		}
 
-		private ReadableDomainProperties setDomainProperties(String description, String externalId, IdReferenceType rootPolicyRef, Pdp pdpConf)
-				throws IOException, IllegalArgumentException
+		private ReadableDomainProperties setDomainProperties(
+				String description, String externalId,
+				IdReferenceType rootPolicyRef, Pdp pdpConf) throws IOException,
+				IllegalArgumentException
 		{
 			// Validate the PDP with new rootPolicyRef first if there is any
-			final AbstractPolicyProvider rootPolicyProvider = pdpConf.getRootPolicyProvider();
+			final AbstractPolicyProvider rootPolicyProvider = pdpConf
+					.getRootPolicyProvider();
 			if (!(rootPolicyProvider instanceof StaticRefBasedRootPolicyProvider))
 			{
 				// critical error
-				throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "'" + "': rootPolicyProvider is not an instance of "
-						+ StaticRefBasedRootPolicyProvider.class + " as expected.");
+				throw new RuntimeException(
+						"Invalid PDP configuration of domain '"
+								+ domainId
+								+ "'"
+								+ "': rootPolicyProvider is not an instance of "
+								+ StaticRefBasedRootPolicyProvider.class
+								+ " as expected.");
 			}
 
 			final StaticRefBasedRootPolicyProvider staticRefBasedRootPolicyProvider = (StaticRefBasedRootPolicyProvider) rootPolicyProvider;
-			// Do nothing if rootPolicyRef is the same/unchanged (loading a new PDP is costly)
-			if (rootPolicyRef != null && !rootPolicyRef.equals(staticRefBasedRootPolicyProvider.getPolicyRef()))
+			// Do nothing if rootPolicyRef is the same/unchanged (loading a new
+			// PDP is costly)
+			if (rootPolicyRef != null
+					&& !rootPolicyRef.equals(staticRefBasedRootPolicyProvider
+							.getPolicyRef()))
 			{
 				// new rootPolicyRef different from old
 				staticRefBasedRootPolicyProvider.setPolicyRef(rootPolicyRef);
@@ -574,11 +684,18 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				if (oldExternalId != null)
 				{
 					// verify oldExternalId valid for domainId
-					final String matchingDomainId = domainIDsByExternalId.get(oldExternalId);
+					final String matchingDomainId = domainIDsByExternalId
+							.get(oldExternalId);
 					if (!domainId.equals(matchingDomainId))
 					{
-						// wrong oldExternalId - this is critical and should not happen, unless the properties file was changed manually
-						throw new RuntimeException("Failed to update externalId of domain '" + domainId + "': wrong oldExternalId arg = " + oldExternalId);
+						// wrong oldExternalId - this is critical and should not
+						// happen, unless the properties file was changed
+						// manually
+						throw new RuntimeException(
+								"Failed to update externalId of domain '"
+										+ domainId
+										+ "': wrong oldExternalId arg = "
+										+ oldExternalId);
 					}
 
 					domainIDsByExternalId.remove(oldExternalId);
@@ -587,7 +704,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				domainIDsByExternalId.put(externalId, domainId);
 			}
 
-			return new ReadableDomainPropertiesImpl(domainId, description, externalId, staticRefBasedRootPolicyProvider.getPolicyRef());
+			return new ReadableDomainPropertiesImpl(domainId, description,
+					externalId, staticRefBasedRootPolicyProvider.getPolicyRef());
 		}
 
 		/**
@@ -595,40 +713,55 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		 * 
 		 * @return domain properties
 		 * @throws IOException
-		 *             Error unmarshalling properties from XML files in domain directory
+		 *             Error unmarshalling properties from XML files in domain
+		 *             directory
 		 */
 		@Override
-		public ReadableDomainProperties getDomainProperties() throws IOException
+		public ReadableDomainProperties getDomainProperties()
+				throws IOException
 		{
 			final DomainProperties props = getProperties();
 
 			// Get rootPolicyRef from PDP conf
 			final Pdp pdpConf = getPDPConfTmpl();
-			final AbstractPolicyProvider rootPolicyProvider = pdpConf.getRootPolicyProvider();
+			final AbstractPolicyProvider rootPolicyProvider = pdpConf
+					.getRootPolicyProvider();
 			if (!(rootPolicyProvider instanceof StaticRefBasedRootPolicyProvider))
 			{
 				// critical error
-				throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "'" + "': rootPolicyProvider is not an instance of "
-						+ StaticRefBasedRootPolicyProvider.class + " as expected.");
+				throw new RuntimeException(
+						"Invalid PDP configuration of domain '"
+								+ domainId
+								+ "'"
+								+ "': rootPolicyProvider is not an instance of "
+								+ StaticRefBasedRootPolicyProvider.class
+								+ " as expected.");
 			}
 
 			final StaticRefBasedRootPolicyProvider staticRefBasedRootPolicyProvider = (StaticRefBasedRootPolicyProvider) rootPolicyProvider;
-			return new ReadableDomainPropertiesImpl(domainId, props.getDescription(), props.getExternalId(), staticRefBasedRootPolicyProvider.getPolicyRef());
+			return new ReadableDomainPropertiesImpl(domainId,
+					props.getDescription(), props.getExternalId(),
+					staticRefBasedRootPolicyProvider.getPolicyRef());
 		}
 
 		@Override
-		public ReadableDomainProperties setDomainProperties(WritableDomainProperties domainProperties) throws IOException, IllegalArgumentException
+		public ReadableDomainProperties setDomainProperties(
+				WritableDomainProperties domainProperties) throws IOException,
+				IllegalArgumentException
 		{
 			if (domainProperties == null)
 			{
 				throw NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION;
 			}
 
-			// Synchronize changes on PDP (and other domain conf data) from multiple threads, keep minimal things in the synchronized block
+			// Synchronize changes on PDP (and other domain conf data) from
+			// multiple threads, keep minimal things in the synchronized block
 			synchronized (domainDir)
 			{
 				final Pdp pdpConf = getPDPConfTmpl();
-				return setDomainProperties(domainProperties.getDescription(), domainProperties.getExternalId(), domainProperties.getRootPolicyRef(), pdpConf);
+				return setDomainProperties(domainProperties.getDescription(),
+						domainProperties.getExternalId(),
+						domainProperties.getRootPolicyRef(), pdpConf);
 			}
 
 		}
@@ -651,22 +784,25 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		 * @throws IOException
 		 */
 		@Override
-		public List<AbstractAttributeProvider> getAttributeProviders() throws IOException
+		public List<AbstractAttributeProvider> getAttributeProviders()
+				throws IOException
 		{
 			final Pdp pdpConf = getPDPConfTmpl();
 			return pdpConf.getAttributeProviders();
 		}
 
 		@Override
-		public List<AbstractAttributeProvider> setAttributeProviders(List<AbstractAttributeProvider> attributeproviders) throws IOException,
-				IllegalArgumentException
+		public List<AbstractAttributeProvider> setAttributeProviders(
+				List<AbstractAttributeProvider> attributeproviders)
+				throws IOException, IllegalArgumentException
 		{
 			if (attributeproviders == null)
 			{
 				throw NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION;
 			}
 
-			// Synchronize changes on PDP (and other domain conf data) from multiple threads, keep minimal things in the synchronized block
+			// Synchronize changes on PDP (and other domain conf data) from
+			// multiple threads, keep minimal things in the synchronized block
 			synchronized (domainDir)
 			{
 				final Pdp pdpConf = getPDPConfTmpl();
@@ -682,13 +818,20 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		public Set<String> getPolicyIDs() throws IOException
 		{
 			/*
-			 * We could cache this, but note that caching may be taking place upfront already. For instance, if this is used behind a HTTP API, the result may
-			 * be cached by the HTTP server or web framework already. For instance, you can enable server-side caching in CXF JAXRS framework with Ehcache-web.
+			 * We could cache this, but note that caching may be taking place
+			 * upfront already. For instance, if this is used behind a HTTP API,
+			 * the result may be cached by the HTTP server or web framework
+			 * already. For instance, you can enable server-side caching in CXF
+			 * JAXRS framework with Ehcache-web.
 			 */
-			final File[] directories = policyParentDirectory.listFiles(DIRECTORY_FILTER);
+			final File[] directories = policyParentDirectory
+					.listFiles(DIRECTORY_FILTER);
 			if (directories == null)
 			{
-				throw new IOException("Error listing files in policies directory '" + policyParentDirectory + "' of domain '" + domainId + "'");
+				throw new IOException(
+						"Error listing files in policies directory '"
+								+ policyParentDirectory + "' of domain '"
+								+ domainId + "'");
 			}
 
 			final Set<String> policyIds = new HashSet<>(directories.length);
@@ -701,7 +844,9 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 					policyId = FileBasedDAOUtils.base64UrlDecode(policyDirName);
 				} catch (IllegalArgumentException e)
 				{
-					throw new RuntimeException("Invalid policy directory name (bad encoding): " + policyDirName);
+					throw new RuntimeException(
+							"Invalid policy directory name (bad encoding): "
+									+ policyDirName);
 				}
 
 				policyIds.add(policyId);
@@ -720,22 +865,27 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		{
 			assert policyId != null;
 			// Name of directory is base64url-encoded policyID (no padding)
-			final String policyDirName = FileBasedDAOUtils.base64UrlEncode(policyId);
+			final String policyDirName = FileBasedDAOUtils
+					.base64UrlEncode(policyId);
 			return new File(this.policyParentDirectory, policyDirName);
 		}
 
-		private File getPolicyVersionFile(File policyDirectory, String versionId)
+		private File getPolicyVersionFile(File policyDirectory,
+				PolicyVersion version)
 		{
-			return new File(policyDirectory, versionId + policyFilenameSuffix);
+			return new File(policyDirectory, version + policyFilenameSuffix);
 		}
 
-		private File getPolicyVersionFile(String policyId, String versionId)
+		private File getPolicyVersionFile(String policyId,
+				PolicyVersion versionId)
 		{
-			return new File(getPolicyDirectory(policyId), versionId + policyFilenameSuffix);
+			return new File(getPolicyDirectory(policyId), versionId
+					+ policyFilenameSuffix);
 		}
 
 		@Override
-		public PolicySet addPolicy(PolicySet policySet) throws IOException, IllegalArgumentException, TooManyPoliciesException
+		public PolicySet addPolicy(PolicySet policySet) throws IOException,
+				IllegalArgumentException, TooManyPoliciesException
 		{
 			if (policySet == null)
 			{
@@ -744,39 +894,36 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 			final String policyId = policySet.getPolicySetId();
 			final File policyDir = getPolicyDirectory(policyId);
-			final File policyVersionFile = getPolicyVersionFile(policyDir, policySet.getVersion());
+			final PolicyVersion policyVersion = new PolicyVersion(
+					policySet.getVersion());
+			final File policyVersionFile = getPolicyVersionFile(policyDir,
+					policyVersion);
+			final NavigableSet<PolicyVersion> policyVersions;
+			final int excessOfPolicyVersionsToBeRemoved;
 
 			synchronized (domainDir)
 			{
-				if (policyDir.exists())
+				policyVersions = getPolicyVersions(policyId);
+				// policyVersions empty if versionsByPolicyId does not contain
+				// key policyId
+				if (policyVersions.isEmpty())
 				{
-					if (policyVersionFile.exists())
-					{
-						// conflict: some policy with same ID and version already exists, return it
-						return getPolicy(policyVersionFile);
-					}
+					// new policy
+					policyVersions.add(policyVersion);
+					versionsByPolicyId.put(policyId, policyVersions);
 
-					// new policy version
-					// check whether limit of number of versions is reached
-					if (maxNumOfVersionsPerPolicy > 0)
-					{
-						final NavigableSet<PolicyVersion> policyVersions = getPolicyVersions(policyDir);
-						if (policyVersions.size() > maxNumOfVersionsPerPolicy)
-						{
-							// too many versions, we cannot just delete old versions because the root policy may reference one of them
-							throw maxNumOfVersionsReachedException;
-						}
-					}
-				} else
-				{
 					// new policy (and new version a fortiori)
 					// check whether limit of number of policies is reached
 					if (maxNumOfPoliciesPerDomain > 0)
 					{
-						final File[] directories = policyParentDirectory.listFiles(DIRECTORY_FILTER);
+						final File[] directories = policyParentDirectory
+								.listFiles(DIRECTORY_FILTER);
 						if (directories == null)
 						{
-							throw new IOException("Error listing files in policies directory '" + policyParentDirectory + "' of domain '" + domainId + "'");
+							throw new IOException(
+									"Error listing files in policies directory '"
+											+ policyParentDirectory
+											+ "' of domain '" + domainId + "'");
 						}
 
 						if (directories.length > maxNumOfPoliciesPerDomain)
@@ -787,8 +934,48 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 					if (!policyDir.mkdir())
 					{
-						throw new IOException("Error creating directory '" + policyDir + "' for new policy '" + policyId + "' in domain '" + domainId + "'");
+						throw new IOException("Error creating directory '"
+								+ policyDir + "' for new policy '" + policyId
+								+ "' in domain '" + domainId + "'");
 					}
+
+				} else
+				{
+					// policy already exists
+					if (!policyVersions.add(policyVersion))
+					{
+						/*
+						 * conflict: same policy version already exists, return
+						 * it
+						 */
+						return getPolicy(policyVersionFile);
+					}
+				}
+
+				/*
+				 * New policy version. Check whether number of versions > max
+				 */
+				if (maxNumOfVersionsPerPolicy > 0)
+				{
+					excessOfPolicyVersionsToBeRemoved = policyVersions.size()
+							- maxNumOfVersionsPerPolicy;
+					/*
+					 * if too many versions after adding the new one, but we
+					 * will not remove any to fix it, then throw an error
+					 */
+					if (excessOfPolicyVersionsToBeRemoved > 0
+							&& !removeOldestVersionsIfMaxExceeded)
+					{
+						/*
+						 * Oldest versions will not be removed, therefore we
+						 * cannot add policies anymore without exceeding max
+						 */
+						throw maxNumOfVersionsReachedException;
+					}
+				} else
+				{
+					// number of versions per policy is unlimited
+					excessOfPolicyVersionsToBeRemoved = 0;
 				}
 
 				writePolicy(policySet, policyVersionFile);
@@ -797,14 +984,51 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				try
 				{
 					reloadPDP();
-					// PDP reloaded successfully, we can safely delete
+					// PDP reloaded successfully
+					if (excessOfPolicyVersionsToBeRemoved > 0)
+					{
+						/*
+						 * too many versions, we need to remove some (the oldest
+						 * that are not required by the PDP)
+						 */
+						final PolicyVersion requiredPolicyVersion = pdp
+								.getStaticRootAndRefPolicies().get(policyId);
+						final Iterator<PolicyVersion> oldestToLatestVersionIterator = policyVersions
+								.descendingIterator();
+						int numRemoved = 0;
+						while (oldestToLatestVersionIterator.hasNext()
+								&& numRemoved < excessOfPolicyVersionsToBeRemoved)
+						{
+							final PolicyVersion version = oldestToLatestVersionIterator
+									.next();
+							// remove only if not required
+							if (version.equals(requiredPolicyVersion))
+							{
+								continue;
+							}
+
+							removePolicyVersion(policyId, version);
+							numRemoved++;
+						}
+
+					}
 				} catch (Throwable e)
 				{
 					// PDP reload failed -> rollback
-					if (!policyVersionFile.delete())
+					if (policyVersionFile.delete())
 					{
-						throw new IOException("Failed to delete file of invalid policy that caused PDP instantiation failure: '" + policyVersionFile
-								+ "'. Please delete manually.", e);
+						policyVersions.remove(policyVersion);
+						if (policyVersions.isEmpty())
+						{
+							versionsByPolicyId.remove(policyId);
+						}
+					} else
+					{
+						throw new IOException(
+								"Failed to delete file of invalid policy that caused PDP instantiation failure: '"
+										+ policyVersionFile
+										+ "'. Please delete manually and reload the domain.",
+								e);
 					}
 
 					throw e;
@@ -844,10 +1068,12 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		 * Get policy versions from policy directory from latest to oldest
 		 * 
 		 * @param policyDirectory
-		 * @return versions; empty if directory does not exist or is not a directory
+		 * @return versions; empty if directory does not exist or is not a
+		 *         directory
 		 * @throws IOException
 		 */
-		private NavigableSet<PolicyVersion> getPolicyVersions(File policyDirectory) throws IOException
+		private NavigableSet<PolicyVersion> getPolicyVersions(
+				File policyDirectory) throws IOException
 		{
 			assert policyDirectory != null;
 
@@ -856,17 +1082,25 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				return EMPTY_TREE_SET;
 			}
 
-			final File[] files = policyDirectory.listFiles(policyFilenameFilter);
+			final File[] files = policyDirectory
+					.listFiles(policyFilenameFilter);
 			if (files == null)
 			{
-				throw new IOException("Error listing policy version files in policy directory '" + policyDirectory + "' of domain '" + domainId + "'");
+				throw new IOException(
+						"Error listing policy version files in policy directory '"
+								+ policyDirectory + "' of domain '" + domainId
+								+ "'");
 			}
 
-			final TreeSet<PolicyVersion> versions = new TreeSet<>(Collections.reverseOrder());
+			final TreeSet<PolicyVersion> versions = new TreeSet<>(
+					Collections.reverseOrder());
 			for (final File file : files)
 			{
 				final String versionPlusSuffix = file.getName();
-				final String versionId = versionPlusSuffix.substring(0, versionPlusSuffix.length() - policyFilenameSuffix.length());
+				final String versionId = versionPlusSuffix.substring(
+						0,
+						versionPlusSuffix.length()
+								- policyFilenameSuffix.length());
 				final PolicyVersion version = new PolicyVersion(versionId);
 				versions.add(version);
 			}
@@ -875,78 +1109,86 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		}
 
 		@Override
-		public NavigableSet<PolicyVersion> getPolicyVersions(String policyId) throws IOException
+		public NavigableSet<PolicyVersion> getPolicyVersions(String policyId)
+				throws IOException
 		{
 			if (policyId == null)
 			{
 				return EMPTY_TREE_SET;
 			}
 
-			/*
-			 * We could cache this, but note that caching may be taking place upfront already. For instance, if this is used behind a HTTP API, the result may
-			 * be cached by the HTTP server or web framework already. For instance, you can enable server-side caching in CXF JAXRS framework with Ehcache-web.
-			 */
+			final NavigableSet<PolicyVersion> policyVersions = versionsByPolicyId
+					.get(policyId);
+			if (policyVersions != null)
+			{
+				return policyVersions;
+			}
+
 			final File policyDir = getPolicyDirectory(policyId);
-			return getPolicyVersions(policyDir);
+			final NavigableSet<PolicyVersion> newPolicyVersions = getPolicyVersions(policyDir);
+			if (newPolicyVersions.isEmpty())
+			{
+				// no such policy
+				return EMPTY_TREE_SET;
+			}
+
+			versionsByPolicyId.put(policyId, newPolicyVersions);
+			return newPolicyVersions;
 		}
 
 		@Override
-		public NavigableSet<PolicyVersion> removePolicy(String policyId) throws IOException, IllegalArgumentException
+		public NavigableSet<PolicyVersion> removePolicy(String policyId)
+				throws IOException, IllegalArgumentException
 		{
 			if (policyId == null)
 			{
 				return EMPTY_TREE_SET;
 			}
 
-			final File policyDir = getPolicyDirectory(policyId);
-			final NavigableSet<PolicyVersion> versions = getPolicyVersions(policyDir);
-			if (versions.isEmpty())
+			final PolicyVersion requiredPolicyVersion = pdp
+					.getStaticRootAndRefPolicies().get(policyId);
+			if (requiredPolicyVersion != null)
 			{
-				// nothing to remove
-				return EMPTY_TREE_SET;
+				throw new IllegalArgumentException(
+						"Policy '"
+								+ policyId
+								+ "' cannot be removed because this policy (version "
+								+ requiredPolicyVersion
+								+ ") is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
 			}
 
+			final NavigableSet<PolicyVersion> versions;
 			synchronized (domainDir)
 			{
-				/*
-				 * Try reload PDP without the policy (directory) to see if it can be removed safely, i.e. it is no longer used/required
-				 */
-				final File tmpBackupFile = new File(domainDir, policyDir.getName() + FILE_BACKUP_SUFFIX);
-				if (!policyDir.renameTo(tmpBackupFile))
-				{
-					throw new IOException("Error creating policy file backup before removal: " + policyDir + " -> " + tmpBackupFile);
-				}
-
+				versions = getPolicyVersions(policyId);
+				final File policyDir = getPolicyDirectory(policyId);
 				try
 				{
-					reloadPDP();
-					// PDP reloaded successfully, we can safely delete
-					FileUtils.deleteDirectory(tmpBackupFile);
-				} catch (Throwable e)
+					// if directory does not exist, this method just returns
+					// right away
+					FileUtils.deleteDirectory(policyDir);
+					versionsByPolicyId.remove(policyId);
+				} catch (IOException e)
 				{
-					// PDP reload failed -> rollback
-					if (!tmpBackupFile.renameTo(policyDir))
-					{
-						throw new IOException("Error restoring policy file from backup after failed removal (causing PDP instantiation failure): "
-								+ tmpBackupFile + " -> " + policyDir);
-					}
-					
-					// the request to remove the policy is not legit (PDP needs it)
-					throw new IllegalArgumentException("Policy '" + policyId + "' cannot be removed because it is still used as root policy, or referenced directly/indirectly by the root policy. Removing this policy would cause the following PDP loading error", e);
+					throw new IOException("Error removing policy directory: "
+							+ policyDir);
 				}
 			}
+
 			return versions;
 		}
 
 		@Override
-		public VERSION_DAO_CLIENT getVersionDAOClient(String policyId, String version)
+		public VERSION_DAO_CLIENT getVersionDAOClient(String policyId,
+				PolicyVersion version)
 		{
 			if (policyId == null || version == null)
 			{
 				return null;
 			}
 
-			return policyVersionDAOClientFactory.getInstance(policyId, version, this);
+			return policyVersionDAOClientFactory.getInstance(policyId, version,
+					this);
 		}
 
 		/**
@@ -968,11 +1210,14 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			final JAXBElement<PolicySet> policyElt;
 			try
 			{
-				final Unmarshaller unmarshaller = JaxbXACMLUtils.createXacml3Unmarshaller();
-				policyElt = unmarshaller.unmarshal(new StreamSource(policyFile), PolicySet.class);
+				final Unmarshaller unmarshaller = JaxbXACMLUtils
+						.createXacml3Unmarshaller();
+				policyElt = unmarshaller.unmarshal(
+						new StreamSource(policyFile), PolicySet.class);
 			} catch (JAXBException e)
 			{
-				throw new IOException("Error getting a policy of domain '" + domainId + "'", e);
+				throw new IOException("Error getting a policy of domain '"
+						+ domainId + "'", e);
 			}
 
 			return policyElt.getValue();
@@ -985,95 +1230,130 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		 *            target file
 		 * @throws IOException
 		 */
-		private void writePolicy(PolicySet policy, File file) throws IOException
+		private void writePolicy(PolicySet policy, File file)
+				throws IOException
 		{
 			assert policy != null;
 			assert file != null;
 
 			try
 			{
-				final Marshaller marshaller = JaxbXACMLUtils.createXacml3Marshaller();
+				final Marshaller marshaller = JaxbXACMLUtils
+						.createXacml3Marshaller();
 				marshaller.marshal(policy, file);
 			} catch (JAXBException e)
 			{
-				throw new IOException("Error saving policy in domain '" + domainId + "'", e);
+				throw new IOException("Error saving policy in domain '"
+						+ domainId + "'", e);
 			}
 		}
 
 		@Override
-		public PolicySet getPolicyVersion(String policyId, String version) throws IOException
+		public PolicySet getPolicyVersion(String policyId, PolicyVersion version)
+				throws IOException
 		{
 			if (policyId == null || version == null)
 			{
 				return null;
 			}
 
-			final File policyVersionFile = getPolicyVersionFile(policyId, version);
+			final File policyVersionFile = getPolicyVersionFile(policyId,
+					version);
 			return getPolicy(policyVersionFile);
 		}
 
 		@Override
-		public PolicySet removePolicyVersion(String policyId, String version) throws IOException, IllegalArgumentException
+		public PolicyVersion getLatestPolicyVersionId(String policyId)
+				throws IOException
+		{
+			final NavigableSet<PolicyVersion> policyVersions = getPolicyVersions(policyId);
+			return policyVersions.first();
+		}
+
+		@Override
+		public PolicySet removePolicyVersion(String policyId,
+				PolicyVersion version) throws IOException,
+				IllegalArgumentException
 		{
 			if (policyId == null || version == null)
 			{
 				return null;
 			}
 
-			final File policyVersionFile = getPolicyVersionFile(policyId, version);
-			final PolicySet policy = getPolicy(policyVersionFile);
-			if (policy == null)
-			{
-				return null;
-			}
+			final File policyVersionFile = getPolicyVersionFile(policyId,
+					version);
 
-			// Reload PDP without the policy (version)
-			final File tmpBackupFile = new File(policyVersionFile.getParentFile(), policyVersionFile.getName() + FILE_BACKUP_SUFFIX);
+			final PolicySet policy;
 			synchronized (domainDir)
 			{
-				if (!policyVersionFile.renameTo(tmpBackupFile))
+				policy = getPolicy(policyVersionFile);
+				if (policy == null)
 				{
-					throw new IOException("Failed to make policy backup file before removal: '" + policyVersionFile + "' -> '" + tmpBackupFile);
+					return null;
 				}
-				try
-				{
-					reloadPDP();
-					// PDP reloaded successfully, we can safely delete
-					if (!tmpBackupFile.delete())
-					{
-						throw new IOException("Failed to delete policy backup file: '" + tmpBackupFile + "'. Please delete manually.");
-					}
 
-				} catch (Throwable e)
+				final PolicyVersion requiredPolicyVersion = pdp
+						.getStaticRootAndRefPolicies().get(policyId);
+				if (requiredPolicyVersion.toString().equals(version))
 				{
-					// PDP reload failed -> rollback
-					if (!tmpBackupFile.renameTo(policyVersionFile))
-					{
-						throw new IOException("Failed to restore policy backup file after failed removal (causing PDP instantiation failure): '"
-								+ tmpBackupFile + "' -> '" + policyVersionFile);
-					}
-
-					throw e;
+					throw new IllegalArgumentException(
+							"Policy '"
+									+ policyId
+									+ "' / Version "
+									+ version
+									+ " cannot be removed because it is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
 				}
+
+				if (policyVersionFile.delete())
+				{
+					final NavigableSet<PolicyVersion> versions = getPolicyVersions(policyId);
+					versions.remove(version);
+					if (versions.isEmpty())
+					{
+						final File policyDir = getPolicyDirectory(policyId);
+						try
+						{
+							FileUtils.deleteDirectory(policyDir);
+							versionsByPolicyId.remove(policyId);
+						} catch (IOException e)
+						{
+							throw new IOException(
+									"Error removing policy directory: "
+											+ policyDir);
+						}
+					}
+				} else
+				{
+					throw new IOException("Failed to delete policy file: '"
+							+ policyVersionFile + "'");
+				}
+
 			}
 
 			return policy;
 		}
+
 	}
 
 	/**
-	 * Create domain DAO and register it in the map (incl. domainIDsByExternalId if props != null && props.getExternalId() != null)
+	 * Create domain DAO and register it in the map (incl. domainIDsByExternalId
+	 * if props != null && props.getExternalId() != null)
 	 * 
 	 * @param domainId
 	 * @param domainDirectory
 	 * @param props
-	 *            (optional), specific domain properties, or null if default or no properties should be used
+	 *            (optional), specific domain properties, or null if default or
+	 *            no properties should be used
 	 * @throws IOException
 	 */
-	private void addDomainToMapsAfterDirectoryCreated(String domainId, File domainDirectory, WritableDomainProperties props) throws IOException
+	private void addDomainToMapsAfterDirectoryCreated(String domainId,
+			File domainDirectory, WritableDomainProperties props)
+			throws IOException
 	{
-		final FileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> domainDAO = new FileBasedDomainDAOImpl(domainDirectory, props);
-		final DOMAIN_DAO_CLIENT domainDAOClient = domainDAOClientFactory.getInstance(domainId, domainDAO);
+		final FileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> domainDAO = new FileBasedDomainDAOImpl(
+				domainDirectory, props);
+		final DOMAIN_DAO_CLIENT domainDAOClient = domainDAOClientFactory
+				.getInstance(domainId, domainDAO);
 		this.domainMap.put(domainId, domainDAOClient);
 
 		if (props == null)
@@ -1108,10 +1388,12 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			final WatchKey key;
 			try
 			{
-				key = dir.register(domainsFolderWatcher, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
+				key = dir.register(domainsFolderWatcher, ENTRY_CREATE,
+						ENTRY_DELETE, ENTRY_MODIFY);
 			} catch (IOException ex)
 			{
-				throw new RuntimeException("Failed to register directory '" + dir + "' with WatchService for synchronization", ex);
+				throw new RuntimeException("Failed to register directory '"
+						+ dir + "' with WatchService for synchronization", ex);
 			}
 
 			if (LOGGER.isDebugEnabled())
@@ -1175,15 +1457,19 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 						// entry
 						final WatchEvent<Path> ev = cast(event);
 						final Path childRelativePath = ev.context();
-						final Path childAbsPath = dir.resolve(childRelativePath);
+						final Path childAbsPath = dir
+								.resolve(childRelativePath);
 
 						// print out event
-						LOGGER.info("Domains folder change detected: {}: {}", event.kind().name(), childRelativePath);
+						LOGGER.info("Domains folder change detected: {}: {}",
+								event.kind().name(), childRelativePath);
 
 						// if directory is created, and watching recursively,
 						// then
 						// register it and its sub-directories
-						if (/* recursive && */kind == ENTRY_CREATE && Files.isDirectory(childAbsPath, LinkOption.NOFOLLOW_LINKS))
+						if (/* recursive && */kind == ENTRY_CREATE
+								&& Files.isDirectory(childAbsPath,
+										LinkOption.NOFOLLOW_LINKS))
 						{
 							// registerAll(child);
 							addWatchedDirectory(childAbsPath);
@@ -1197,16 +1483,21 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 							// this
 							// level)
 							// && evaluated before ||
-							if (kind == ENTRY_CREATE && Files.isDirectory(childAbsPath, LinkOption.NOFOLLOW_LINKS) || kind == ENTRY_DELETE)
+							if (kind == ENTRY_CREATE
+									&& Files.isDirectory(childAbsPath,
+											LinkOption.NOFOLLOW_LINKS)
+									|| kind == ENTRY_DELETE)
 							{
 								domainFolderToEventMap.put(childAbsPath, kind);
 							}
 						} else
 						{
 							/*
-							 * modify on subfolder (domain) If no CREATE event already registered in map, register MODIFY
+							 * modify on subfolder (domain) If no CREATE event
+							 * already registered in map, register MODIFY
 							 */
-							final WatchEvent.Kind<?> eventKind = domainFolderToEventMap.get(dir);
+							final WatchEvent.Kind<?> eventKind = domainFolderToEventMap
+									.get(dir);
 							if (eventKind != ENTRY_CREATE)
 							{
 								domainFolderToEventMap.put(dir, ENTRY_MODIFY);
@@ -1230,47 +1521,64 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				}
 
 				// do the actions according to map
-				LOGGER.debug("Synchronization events to be handled: {}", domainFolderToEventMap);
-				for (final Entry<Path, Kind<?>> domainFolderToEventEntry : domainFolderToEventMap.entrySet())
+				LOGGER.debug("Synchronization events to be handled: {}",
+						domainFolderToEventMap);
+				for (final Entry<Path, Kind<?>> domainFolderToEventEntry : domainFolderToEventMap
+						.entrySet())
 				{
-					final Path domainDirPath = domainFolderToEventEntry.getKey();
-					final Kind<?> eventKind = domainFolderToEventEntry.getValue();
+					final Path domainDirPath = domainFolderToEventEntry
+							.getKey();
+					final Kind<?> eventKind = domainFolderToEventEntry
+							.getValue();
 					// domain folder name is assumed to be a domain ID
 					final Path lastPathSegment = domainDirPath.getFileName();
 					if (lastPathSegment == null)
 					{
-						throw new RuntimeException("Invalid Domain folder '" + domainDirPath + "': no filename");
+						throw new RuntimeException("Invalid Domain folder '"
+								+ domainDirPath + "': no filename");
 					}
 
 					final String domainId = lastPathSegment.toString();
 					if (eventKind == ENTRY_CREATE || eventKind == ENTRY_MODIFY)
 					{
 						/*
-						 * synchonized block makes sure no other thread is messing with the domains directory while we synchronize it to domainMap. See also
-						 * method #add(Properties)
+						 * synchonized block makes sure no other thread is
+						 * messing with the domains directory while we
+						 * synchronize it to domainMap. See also method
+						 * #add(Properties)
 						 */
 						synchronized (domainsRootDir)
 						{
-							final DOMAIN_DAO_CLIENT secDomain = domainMap.get(domainId);
+							final DOMAIN_DAO_CLIENT secDomain = domainMap
+									.get(domainId);
 							// Force creation if domain does not exist, else
 							// reload
 							if (secDomain == null)
 							{
 								// force creation
-								LOGGER.info("Sync event '{}' on domain '{}: domain not found in memory -> loading new domain from folder '{}'", new Object[] {
-										eventKind, domainId, domainDirPath });
-								addDomainToMapsAfterDirectoryCreated(domainId, domainDirPath.toFile(), null);
+								LOGGER.info(
+										"Sync event '{}' on domain '{}: domain not found in memory -> loading new domain from folder '{}'",
+										new Object[] { eventKind, domainId,
+												domainDirPath });
+								addDomainToMapsAfterDirectoryCreated(domainId,
+										domainDirPath.toFile(), null);
 							} else
 							{
-								LOGGER.info("Sync event '{}' on domain '{}: domain found in memory -> reloading from folder '{}'", new Object[] { eventKind,
-										domainId, domainDirPath });
+								LOGGER.info(
+										"Sync event '{}' on domain '{}: domain found in memory -> reloading from folder '{}'",
+										new Object[] { eventKind, domainId,
+												domainDirPath });
 								secDomain.getDAO().reloadPDP();
 							}
 						}
 					} else if (eventKind == ENTRY_DELETE)
 					{
-						// it's only removing from the map so no need to sync on the filesystem directory
-						LOGGER.info("Sync event '{}' on domain '{}: deleting if exists in memory", new Object[] { eventKind, domainId, domainDirPath });
+						// it's only removing from the map so no need to sync on
+						// the filesystem directory
+						LOGGER.info(
+								"Sync event '{}' on domain '{}: deleting if exists in memory",
+								new Object[] { eventKind, domainId,
+										domainDirPath });
 						removeDomainFromMapsAfterDirectoryDeleted(domainId);
 					}
 				}
@@ -1280,16 +1588,20 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				domainFolderToEventMap.clear();
 			} catch (Throwable e)
 			{
-				LOGGER.error("Error occurred during domains folder synchronization task", e);
+				LOGGER.error(
+						"Error occurred during domains folder synchronization task",
+						e);
 			}
 		}
 
 		private void removeDomainFromMapsAfterDirectoryDeleted(String domainId)
 		{
-			final Iterator<Entry<String, String>> domainEntryIterator = domainIDsByExternalId.entrySet().iterator();
+			final Iterator<Entry<String, String>> domainEntryIterator = domainIDsByExternalId
+					.entrySet().iterator();
 			while (domainEntryIterator.hasNext())
 			{
-				final Entry<String, String> domainEntry = domainEntryIterator.next();
+				final Entry<String, String> domainEntry = domainEntryIterator
+						.next();
 				if (domainId.equals(domainEntry.getValue()))
 				{
 					domainEntryIterator.remove();
@@ -1302,33 +1614,54 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	 * Creates instance
 	 * 
 	 * @param domainsRoot
-	 *            root directory of the configuration data of security domains, one subdirectory per domain
+	 *            root directory of the configuration data of security domains,
+	 *            one subdirectory per domain
 	 * @param domainTmpl
-	 *            domain template directory; directories of new domains are created from this template
+	 *            domain template directory; directories of new domains are
+	 *            created from this template
 	 * @param domainsSyncIntervalSec
-	 *            how often (in seconds) the synchronization of managed domains (in memory) with the domain subdirectories in the <code>domainsRoot</code>
-	 *            directory (on disk) is done. If <code>domainSyncInterval</code> > 0, every <code>domainSyncInterval</code>, the managed domains (loaded in
-	 *            memory) are updated if any change has been detected in the <code>domainsRoot</code> directory in this interval (since last sync). To be more
-	 *            specific, <i>any change</i> here means any creation/deletion/modification of a domain folder (modification means: any file changed within the
-	 *            folder). If <code>domainSyncInterval</code> &lt;= 0, synchronization is disabled.
+	 *            how often (in seconds) the synchronization of managed domains
+	 *            (in memory) with the domain subdirectories in the
+	 *            <code>domainsRoot</code> directory (on disk) is done. If
+	 *            <code>domainSyncInterval</code> > 0, every
+	 *            <code>domainSyncInterval</code>, the managed domains (loaded
+	 *            in memory) are updated if any change has been detected in the
+	 *            <code>domainsRoot</code> directory in this interval (since
+	 *            last sync). To be more specific, <i>any change</i> here means
+	 *            any creation/deletion/modification of a domain folder
+	 *            (modification means: any file changed within the folder). If
+	 *            <code>domainSyncInterval</code> &lt;= 0, synchronization is
+	 *            disabled.
 	 * @param pdpModelHandler
 	 *            PDP configuration model handler
 	 * @param maxNumOfPoliciesPerDomain
 	 *            max number of policies per domain, unlimited if negative.
 	 * @param useRandomAddressBasedUUID
-	 *            true iff a random multicast address must be used as node field of generated UUIDs (Version 1), else the MAC address of one of the network
-	 *            interfaces is used. Setting this to 'true' is NOT recommended unless the host is disconnected from the network. These generated UUIDs are used
-	 *            for domain IDs.
+	 *            true iff a random multicast address must be used as node field
+	 *            of generated UUIDs (Version 1), else the MAC address of one of
+	 *            the network interfaces is used. Setting this to 'true' is NOT
+	 *            recommended unless the host is disconnected from the network.
+	 *            These generated UUIDs are used for domain IDs.
 	 * @param maxNumOfVersionsPerPolicy
 	 *            max number of versions per policy, unlimited if negative.
+	 * @param removeOldestVersionsIfMaxExceeded
+	 *            true iff oldest unused policies versions must be automatically
+	 *            removed to make sure that {@code maxNumOfVersionsPerPolicy} is
+	 *            not exceeded
 	 * @param domainDAOClientFactory
 	 *            domain DAO client factory
 	 * @throws IOException
-	 *             I/O error occurred scanning existing domain folders in {@code domainsRoot} for loading; or if {@code domainsSyncIntervalSec > 0} and a
-	 *             WatchService for watching directory changes to the domains on the filesystem could not be created
+	 *             I/O error occurred scanning existing domain folders in
+	 *             {@code domainsRoot} for loading; or if
+	 *             {@code domainsSyncIntervalSec > 0} and a WatchService for
+	 *             watching directory changes to the domains on the filesystem
+	 *             could not be created
 	 */
-	@ConstructorProperties({ "domainsRoot", "domainTmpl", "domainsSyncIntervalSec", "pdpModelHandler", "useRandomAddressBasedUUID",
-			"maxNumOfPoliciesPerDomain", "maxNumOfVersionsPerPolicy", "domainDAOClientFactory" })
+	@ConstructorProperties({ "domainsRoot", "domainTmpl",
+			"domainsSyncIntervalSec", "pdpModelHandler",
+			"useRandomAddressBasedUUID", "maxNumOfPoliciesPerDomain",
+			"maxNumOfVersionsPerPolicy", "removeOldestVersionsIfMaxExceeded",
+			"domainDAOClientFactory" })
 	public FileBasedDomainsDAO(
 			Resource domainsRoot,
 			Resource domainTmpl,
@@ -1337,24 +1670,31 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			boolean useRandomAddressBasedUUID,
 			int maxNumOfPoliciesPerDomain,
 			int maxNumOfVersionsPerPolicy,
+			boolean removeOldestVersionsIfMaxExceeded,
 			DomainDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT, FileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, DOMAIN_DAO_CLIENT> domainDAOClientFactory)
 			throws IOException
 	{
-		if (domainsRoot == null || domainTmpl == null || pdpModelHandler == null || domainDAOClientFactory == null)
+		if (domainsRoot == null || domainTmpl == null
+				|| pdpModelHandler == null || domainDAOClientFactory == null)
 		{
 			throw ILLEGAL_CONSTRUCTOR_ARGS_EXCEPTION;
 		}
 
 		this.domainDAOClientFactory = domainDAOClientFactory;
-		this.policyDAOClientFactory = domainDAOClientFactory.getPolicyDAOClientFactory();
-		this.policyVersionDAOClientFactory = policyDAOClientFactory.getVersionDAOClientFactory();
+		this.policyDAOClientFactory = domainDAOClientFactory
+				.getPolicyDAOClientFactory();
+		this.policyVersionDAOClientFactory = policyDAOClientFactory
+				.getVersionDAOClientFactory();
 
 		this.maxNumOfPoliciesPerDomain = maxNumOfPoliciesPerDomain;
-		this.maxNumOfPoliciesReachedException = new TooManyPoliciesException("Max number of policies (" + maxNumOfPoliciesPerDomain
-				+ ") reached for the domain");
+		this.maxNumOfPoliciesReachedException = new TooManyPoliciesException(
+				"Max number of policies (" + maxNumOfPoliciesPerDomain
+						+ ") reached for the domain");
 		this.maxNumOfVersionsPerPolicy = maxNumOfVersionsPerPolicy;
-		this.maxNumOfVersionsReachedException = new TooManyPoliciesException("Max number of versions (" + maxNumOfVersionsPerPolicy
-				+ ") reached for the policy");
+		this.maxNumOfVersionsReachedException = new TooManyPoliciesException(
+				"Max number of versions (" + maxNumOfVersionsPerPolicy
+						+ ") reached for the policy");
+		this.removeOldestVersionsIfMaxExceeded = removeOldestVersionsIfMaxExceeded;
 
 		this.uuidGen = initUUIDGenerator(useRandomAddressBasedUUID);
 		this.pdpModelHandler = pdpModelHandler;
@@ -1362,10 +1702,14 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		// Validate domainsRoot arg
 		if (!domainsRoot.exists())
 		{
-			throw new IllegalArgumentException("'domainsRoot' resource does not exist: " + domainsRoot.getDescription());
+			throw new IllegalArgumentException(
+					"'domainsRoot' resource does not exist: "
+							+ domainsRoot.getDescription());
 		}
 
-		final String ioExMsg = "Cannot resolve 'domainsRoot' resource '" + domainsRoot.getDescription() + "' as a file on the file system";
+		final String ioExMsg = "Cannot resolve 'domainsRoot' resource '"
+				+ domainsRoot.getDescription()
+				+ "' as a file on the file system";
 		File domainsRootFile = null;
 		try
 		{
@@ -1375,16 +1719,23 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			throw new IllegalArgumentException(ioExMsg, e);
 		}
 
-		FileBasedDAOUtils.checkFile("File defined by SecurityDomainManager parameter 'domainsRoot'", domainsRootFile, true, true);
+		FileBasedDAOUtils
+				.checkFile(
+						"File defined by SecurityDomainManager parameter 'domainsRoot'",
+						domainsRootFile, true, true);
 		this.domainsRootDir = domainsRootFile.toPath();
 
 		// Validate domainTmpl directory arg
 		if (!domainTmpl.exists())
 		{
-			throw new IllegalArgumentException("'domainTmpl' resource does not exist: " + domainTmpl.getDescription());
+			throw new IllegalArgumentException(
+					"'domainTmpl' resource does not exist: "
+							+ domainTmpl.getDescription());
 		}
 
-		final String ioExMsg2 = "Cannot resolve 'domainTmpl' resource '" + domainTmpl.getDescription() + "' as a file on the file system";
+		final String ioExMsg2 = "Cannot resolve 'domainTmpl' resource '"
+				+ domainTmpl.getDescription()
+				+ "' as a file on the file system";
 		File domainTmplFile = null;
 		try
 		{
@@ -1394,7 +1745,9 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			throw new IllegalArgumentException(ioExMsg2, e);
 		}
 
-		FileBasedDAOUtils.checkFile("File defined by SecurityDomainManager parameter 'domainTmpl'", domainTmplFile, true, false);
+		FileBasedDAOUtils.checkFile(
+				"File defined by SecurityDomainManager parameter 'domainTmpl'",
+				domainTmplFile, true, false);
 		this.domainTmplDir = domainTmplFile;
 
 		// Initialize endUserDomains and register their folders to the
@@ -1410,12 +1763,15 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				fsWatchService = FileSystems.getDefault().newWatchService();
 			} catch (IOException e)
 			{
-				throw new IOException("Failed to create a WatchService for watching directory changes to the domains on the filesystem", e);
+				throw new IOException(
+						"Failed to create a WatchService for watching directory changes to the domains on the filesystem",
+						e);
 			}
 
 			if (fsWatchService == null)
 			{
-				throw new IOException("Failed to create a WatchService for watching directory changes to the domains on the filesystem");
+				throw new IOException(
+						"Failed to create a WatchService for watching directory changes to the domains on the filesystem");
 			}
 
 			this.domainsFolderWatcher = fsWatchService;
@@ -1427,15 +1783,19 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			syncTask = null;
 		}
 
-		LOGGER.debug("Looking for domain sub-directories in directory {}", domainsRootDir);
-		try (final DirectoryStream<Path> dirStream = Files.newDirectoryStream(domainsRootDir))
+		LOGGER.debug("Looking for domain sub-directories in directory {}",
+				domainsRootDir);
+		try (final DirectoryStream<Path> dirStream = Files
+				.newDirectoryStream(domainsRootDir))
 		{
 			for (final Path domainPath : dirStream)
 			{
 				LOGGER.debug("Checking domain in file {}", domainPath);
 				if (!Files.isDirectory(domainPath))
 				{
-					LOGGER.warn("Ignoring invalid domain file {} (not a directory)", domainPath);
+					LOGGER.warn(
+							"Ignoring invalid domain file {} (not a directory)",
+							domainPath);
 					continue;
 				}
 
@@ -1443,20 +1803,25 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				final Path lastPathSegment = domainPath.getFileName();
 				if (lastPathSegment == null)
 				{
-					throw new RuntimeException("Invalid Domain folder '" + domainPath + "': no filename");
+					throw new RuntimeException("Invalid Domain folder '"
+							+ domainPath + "': no filename");
 				}
 
 				final String domainId = lastPathSegment.toString();
 				final FileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> domainDAO;
 				try
 				{
-					domainDAO = new FileBasedDomainDAOImpl(domainPath.toFile(), null);
+					domainDAO = new FileBasedDomainDAOImpl(domainPath.toFile(),
+							null);
 				} catch (IllegalArgumentException e)
 				{
-					throw new RuntimeException("Invalid domain data for domain '" + domainId + "'", e);
+					throw new RuntimeException(
+							"Invalid domain data for domain '" + domainId + "'",
+							e);
 				}
 
-				final DOMAIN_DAO_CLIENT domain = domainDAOClientFactory.getInstance(domainId, domainDAO);
+				final DOMAIN_DAO_CLIENT domain = domainDAOClientFactory
+						.getInstance(domainId, domainDAO);
 				domainMap.put(domainId, domain);
 
 				if (syncTask != null)
@@ -1466,17 +1831,26 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 		} catch (IOException e)
 		{
-			throw new IOException("Failed to scan files in the domains root directory '" + domainsRootDir + "' looking for domain directories", e);
+			throw new IOException(
+					"Failed to scan files in the domains root directory '"
+							+ domainsRootDir
+							+ "' looking for domain directories", e);
 		}
 
 		/*
-		 * No error occurred, we can start new thread for watching/syncing domains safely now if sync interval > 0
+		 * No error occurred, we can start new thread for watching/syncing
+		 * domains safely now if sync interval > 0
 		 */
 		if (syncTask != null)
 		{
-			domainsFolderSyncTaskScheduler = Executors.newScheduledThreadPool(1);
-			LOGGER.info("Scheduling periodic domains folder synchronization (initial delay={}s, period={}s)", domainsSyncIntervalSec, domainsSyncIntervalSec);
-			domainsFolderSyncTaskScheduler.scheduleWithFixedDelay(syncTask, domainsSyncIntervalSec, domainsSyncIntervalSec, TimeUnit.SECONDS);
+			domainsFolderSyncTaskScheduler = Executors
+					.newScheduledThreadPool(1);
+			LOGGER.info(
+					"Scheduling periodic domains folder synchronization (initial delay={}s, period={}s)",
+					domainsSyncIntervalSec, domainsSyncIntervalSec);
+			domainsFolderSyncTaskScheduler.scheduleWithFixedDelay(syncTask,
+					domainsSyncIntervalSec, domainsSyncIntervalSec,
+					TimeUnit.SECONDS);
 		} else
 		{
 			domainsFolderSyncTaskScheduler = null;
@@ -1486,22 +1860,28 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	}
 
 	/**
-	 * Stop domains folder synchronization thread (to be called by Spring when application stopped)
+	 * Stop domains folder synchronization thread (to be called by Spring when
+	 * application stopped)
 	 */
 	public void stopDomainsSync()
 	{
 		if (domainsFolderSyncTaskScheduler != null)
 		{
-			LOGGER.info("Requesting shutdown of scheduler of periodic domains folder synchronization. Waiting {}s for pending sync task to complete...",
+			LOGGER.info(
+					"Requesting shutdown of scheduler of periodic domains folder synchronization. Waiting {}s for pending sync task to complete...",
 					domainsFolderSyncIntervalSec);
 			shutdownAndAwaitTermination(domainsFolderSyncTaskScheduler);
 			try
 			{
-				LOGGER.info("Closing WatchService used for watching domains folder", domainsFolderSyncIntervalSec);
+				LOGGER.info(
+						"Closing WatchService used for watching domains folder",
+						domainsFolderSyncIntervalSec);
 				domainsFolderWatcher.close();
 			} catch (IOException e)
 			{
-				LOGGER.error("Failed to close WatchService. This may cause a memory leak.", e);
+				LOGGER.error(
+						"Failed to close WatchService. This may cause a memory leak.",
+						e);
 			}
 		}
 	}
@@ -1515,19 +1895,27 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		try
 		{
 			// Wait a while for existing tasks to terminate
-			if (!pool.awaitTermination(domainsFolderSyncIntervalSec, TimeUnit.SECONDS))
+			if (!pool.awaitTermination(domainsFolderSyncIntervalSec,
+					TimeUnit.SECONDS))
 			{
-				LOGGER.error("Scheduler wait timeout ({}s) occurred before task could terminate after shutdown request.", domainsFolderSyncIntervalSec);
+				LOGGER.error(
+						"Scheduler wait timeout ({}s) occurred before task could terminate after shutdown request.",
+						domainsFolderSyncIntervalSec);
 				pool.shutdownNow(); // Cancel currently executing tasks
 				// Wait a while for tasks to respond to being cancelled
-				if (!pool.awaitTermination(domainsFolderSyncIntervalSec, TimeUnit.SECONDS))
+				if (!pool.awaitTermination(domainsFolderSyncIntervalSec,
+						TimeUnit.SECONDS))
 				{
-					LOGGER.error("Scheduler wait timeout ({}s) occurred before task could terminate after shudownNow request.", domainsFolderSyncIntervalSec);
+					LOGGER.error(
+							"Scheduler wait timeout ({}s) occurred before task could terminate after shudownNow request.",
+							domainsFolderSyncIntervalSec);
 				}
 			}
 		} catch (InterruptedException ie)
 		{
-			LOGGER.error("Scheduler interrupted while waiting for sync task to complete", ie);
+			LOGGER.error(
+					"Scheduler interrupted while waiting for sync task to complete",
+					ie);
 			// (Re-)Cancel if current thread also interrupted
 			pool.shutdownNow();
 			// Preserve interrupt status
@@ -1547,17 +1935,21 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	}
 
 	@Override
-	public String addDomain(WritableDomainProperties props) throws IOException, IllegalArgumentException
+	public String addDomain(WritableDomainProperties props) throws IOException,
+			IllegalArgumentException
 	{
 		final UUID uuid = uuidGen.generate();
 		/*
-		 * Encode UUID with Base64url to have shorter IDs in REST API URL paths and to be compatible with filenames on any operating system, since the resulting
-		 * domain ID is used as name for the directory where all the domain's data will be stored.
+		 * Encode UUID with Base64url to have shorter IDs in REST API URL paths
+		 * and to be compatible with filenames on any operating system, since
+		 * the resulting domain ID is used as name for the directory where all
+		 * the domain's data will be stored.
 		 */
 		final ByteBuffer byteBuf = ByteBuffer.wrap(new byte[16]);
 		byteBuf.putLong(uuid.getMostSignificantBits());
 		byteBuf.putLong(uuid.getLeastSignificantBits());
-		final String domainId = FileBasedDAOUtils.base64UrlEncode(byteBuf.array());
+		final String domainId = FileBasedDAOUtils.base64UrlEncode(byteBuf
+				.array());
 		synchronized (domainsRootDir)
 		{
 			// this should not happen if the UUID generator can be trusted, but
@@ -1575,7 +1967,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			if (Files.notExists(domainDir))
 			{
 				/*
-				 * Create/initialize new domain directory from domain template directory
+				 * Create/initialize new domain directory from domain template
+				 * directory
 				 */
 				FileUtils.copyDirectory(this.domainTmplDir, domainDirFile);
 			}
@@ -1595,7 +1988,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		}
 
 		final String domainId = domainIDsByExternalId.get(externalId);
-		return domainId == null ? Collections.<String> emptySet() : Collections.<String> singleton(domainId);
+		return domainId == null ? Collections.<String> emptySet() : Collections
+				.<String> singleton(domainId);
 	}
 
 	@Override

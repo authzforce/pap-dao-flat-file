@@ -6,7 +6,7 @@
 		<version>3.3.7</version>
 	</parent>
 	<artifactId>authzforce-ce-pap-dao-file</artifactId>
-	<version>3.6.2-SNAPSHOT</version>
+	<version>4.0.0-SNAPSHOT</version>
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>AuthZForce CE - File-based PAP DAO implementation</description>
 	<url>https://tuleap.ow2.org/projects/authzforce</url>
@@ -39,12 +39,12 @@
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>${artifactId.prefix}-core-pap-api</artifactId>
-			<version>3.6.0</version>
+			<version>4.0.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>${artifactId.prefix}-core</artifactId>
-			<version>3.7.0</version>
+			<version>3.8.0-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 	<build>
