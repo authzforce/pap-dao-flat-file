@@ -1294,7 +1294,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 				final PolicyVersion requiredPolicyVersion = pdp
 						.getStaticRootAndRefPolicies().get(policyId);
-				if (requiredPolicyVersion.toString().equals(version))
+				if (requiredPolicyVersion.equals(version))
 				{
 					throw new IllegalArgumentException(
 							"Policy '"
