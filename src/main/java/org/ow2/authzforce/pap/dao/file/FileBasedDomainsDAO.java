@@ -115,6 +115,49 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		implements DomainsDAO<DOMAIN_DAO_CLIENT>
 {
 
+	private static final Logger LOGGER = LoggerFactory
+			.getLogger(FileBasedDomainsDAO.class);
+
+	private static class SyncedFile
+	{
+		private final Path filePath;
+		private long lastModifiedTimeAtLastSync;
+
+		private SyncedFile(Path filePath) throws IOException
+		{
+			this.filePath = filePath;
+			this.lastModifiedTimeAtLastSync = Files.getLastModifiedTime(
+					filePath, LinkOption.NOFOLLOW_LINKS).toMillis();
+		}
+
+		/**
+		 * Check for any change on the file since call to constructor or last
+		 * call to this method, i.e. current lastModifiedTime greater than last
+		 * registered during these calls. If there was any, the internal status
+		 * is updated with the new/current lastModifiedTime value.
+		 * 
+		 * @return true iff file was changed since
+		 * @throws IOException
+		 *             I/O error retrieving lastModifiedTime of the file
+		 */
+		private boolean sync() throws IOException
+		{
+			final long newLastModifiedTime = Files.getLastModifiedTime(
+					filePath, LinkOption.NOFOLLOW_LINKS).toMillis();
+			if (newLastModifiedTime > lastModifiedTimeAtLastSync)
+			{
+				LOGGER.debug(
+						"Syncing file '{}': changed (new lastModifiedTime since epoch = {}) since last sync (previous lastModifiedTime since epoch = {})",
+						filePath, newLastModifiedTime,
+						lastModifiedTimeAtLastSync);
+				lastModifiedTimeAtLastSync = newLastModifiedTime;
+				return true;
+			}
+
+			return false;
+		}
+	}
+
 	private static class ReadableDomainPropertiesImpl implements
 			ReadableDomainProperties
 	{
@@ -171,9 +214,6 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 	private static final IllegalArgumentException ILLEGAL_POLICY_NOT_STATIC_EXCEPTION = new IllegalArgumentException(
 			"One of the policy finders in the domain PDP configuration is not static, or one of the policies required by PDP cannot be statically resolved");
-
-	private static final Logger LOGGER = LoggerFactory
-			.getLogger(FileBasedDomainsDAO.class);
 
 	private static final IllegalArgumentException NULL_POLICY_ARGUMENT_EXCEPTION = new IllegalArgumentException(
 			"Null policySet arg");
@@ -331,25 +371,15 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 	private final boolean removeOldestVersionsIfMaxExceeded;
 
-	private ReadableDomainProperties removeDomainFromMapsAfterDirectoryDeleted(
-			ReadableDomainProperties domainProps) throws IOException
+	private synchronized void removeDomainFromMapsOnly(String domainId,
+			String externalId) throws IOException
 	{
-		assert domainProps.getInternalId() != null;
-
-		final DOMAIN_DAO_CLIENT domainDAOClient = domainMap.remove(domainProps
-				.getInternalId());
-		if (domainDAOClient == null)
+		assert domainId != null;
+		domainMap.remove(domainId);
+		if (externalId != null)
 		{
-			return null;
+			domainIDsByExternalId.remove(externalId);
 		}
-
-		final String domainExternalId = domainProps.getExternalId();
-		if (domainExternalId != null)
-		{
-			domainIDsByExternalId.remove(domainExternalId);
-		}
-
-		return domainProps;
 	}
 
 	private final class FileBasedDomainDAOImpl implements
@@ -378,11 +408,11 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 		};
 
-		private volatile PDPImpl pdp;
-
 		private final DefaultEnvironmentProperties pdpConfEnvProps;
 
 		private final ConcurrentHashMap<String, NavigableSet<PolicyVersion>> versionsByPolicyId = new ConcurrentHashMap<>();
+
+		private volatile PDPImpl pdp;
 
 		/**
 		 * Constructs end-user policy admin domain
@@ -477,8 +507,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 		}
 
-		@Override
-		public void reloadPDP() throws IOException, IllegalArgumentException
+		private void reloadPDP() throws IOException, IllegalArgumentException
 		{
 			FileBasedDAOUtils.checkFile("Domain PDP configuration file",
 					pdpConfFile, false, true);
@@ -502,6 +531,15 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			if (staticPoliciesById == null)
 			{
 				throw ILLEGAL_POLICY_NOT_STATIC_EXCEPTION;
+			}
+		}
+
+		@Override
+		public void reload() throws IOException, IllegalArgumentException
+		{
+			synchronized (domainDir)
+			{
+				reloadPDP();
 			}
 		}
 
@@ -1041,16 +1079,21 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		@Override
 		public ReadableDomainProperties removeDomain() throws IOException
 		{
+			final ReadableDomainProperties domainProps;
 			synchronized (domainDir)
 			{
-				final ReadableDomainProperties domainProps = getDomainProperties();
+				domainProps = getDomainProperties();
 				FileUtils.deleteDirectory(domainDir);
 				if (pdp != null)
 				{
 					pdp.close();
 				}
-				return removeDomainFromMapsAfterDirectoryDeleted(domainProps);
+
+				removeDomainFromMapsOnly(domainProps.getInternalId(),
+						domainProps.getExternalId());
 			}
+
+			return domainProps;
 		}
 
 		@Override
@@ -1145,21 +1188,21 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				return EMPTY_TREE_SET;
 			}
 
-			final PolicyVersion requiredPolicyVersion = pdp
-					.getStaticRootAndRefPolicies().get(policyId);
-			if (requiredPolicyVersion != null)
-			{
-				throw new IllegalArgumentException(
-						"Policy '"
-								+ policyId
-								+ "' cannot be removed because this policy (version "
-								+ requiredPolicyVersion
-								+ ") is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
-			}
-
+			final PolicyVersion requiredPolicyVersion;
 			final NavigableSet<PolicyVersion> versions;
 			synchronized (domainDir)
 			{
+				requiredPolicyVersion = pdp.getStaticRootAndRefPolicies().get(
+						policyId);
+				if (requiredPolicyVersion != null)
+				{
+					throw new IllegalArgumentException(
+							"Policy '"
+									+ policyId
+									+ "' cannot be removed because this policy (version "
+									+ requiredPolicyVersion
+									+ ") is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
+				}
 				versions = getPolicyVersions(policyId);
 				final File policyDir = getPolicyDirectory(policyId);
 				try
@@ -1568,7 +1611,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 										"Sync event '{}' on domain '{}: domain found in memory -> reloading from folder '{}'",
 										new Object[] { eventKind, domainId,
 												domainDirPath });
-								secDomain.getDAO().reloadPDP();
+								secDomain.getDAO().reload();
 							}
 						}
 					} else if (eventKind == ENTRY_DELETE)
@@ -1980,16 +2023,31 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	}
 
 	@Override
-	public Set<String> getDomainIDs(String externalId)
+	public Set<String> getDomainIDs(String externalId) throws IOException
 	{
 		if (externalId == null)
 		{
+			// FIXME: sync domainMap with domains directory
 			return Collections.unmodifiableSet(domainMap.keySet());
 		}
 
+		// externalId not null
 		final String domainId = domainIDsByExternalId.get(externalId);
-		return domainId == null ? Collections.<String> emptySet() : Collections
-				.<String> singleton(domainId);
+		if (domainId == null)
+		{
+			return Collections.<String> emptySet();
+		}
+
+		// domainId not null, check if domain is still there in the repository
+		final Path domainDirPath = this.domainsRootDir.resolve(domainId);
+		if (Files.exists(domainDirPath, LinkOption.NOFOLLOW_LINKS))
+		{
+			return Collections.<String> singleton(domainId);
+		}
+
+		// domain directory no longer exists, remove from map and so on
+		removeDomainFromMapsOnly(domainId, externalId);
+		return Collections.<String> emptySet();
 	}
 
 	@Override

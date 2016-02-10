@@ -12,7 +12,17 @@
 package org.ow2.authzforce.pap.dao.file;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Collections;
 
 import com.google.common.io.BaseEncoding;
 
@@ -21,8 +31,10 @@ import com.google.common.io.BaseEncoding;
  */
 public final class FileBasedDAOUtils
 {
-	// FIXME: Instead of google BaseEncoding, use java.util.Base64.getURLEncoder() when moving to Java 8
-	private static final BaseEncoding BASE64URL_NO_PADDING_ENCODING = BaseEncoding.base64Url().omitPadding();
+	// FIXME: Instead of google BaseEncoding, use
+	// java.util.Base64.getURLEncoder() when moving to Java 8
+	private static final BaseEncoding BASE64URL_NO_PADDING_ENCODING = BaseEncoding
+			.base64Url().omitPadding();
 
 	/**
 	 * Encode bytes with base64url specified by RFC 4648, without padding
@@ -37,7 +49,8 @@ public final class FileBasedDAOUtils
 	}
 
 	/**
-	 * Encode string with base64url specified by RFC 4648, without padding. Used to create filenames compatible with most filesystems
+	 * Encode string with base64url specified by RFC 4648, without padding. Used
+	 * to create filenames compatible with most filesystems
 	 * 
 	 * @param input
 	 *            input
@@ -45,24 +58,31 @@ public final class FileBasedDAOUtils
 	 */
 	public static String base64UrlEncode(String input)
 	{
-		return BASE64URL_NO_PADDING_ENCODING.encode(input.getBytes(StandardCharsets.UTF_8));
+		return BASE64URL_NO_PADDING_ENCODING.encode(input
+				.getBytes(StandardCharsets.UTF_8));
 	}
 
 	/**
-	 * Decode string encoded with {@link FileBasedDAOUtils#base64UrlEncode(String)}
+	 * Decode string encoded with
+	 * {@link FileBasedDAOUtils#base64UrlEncode(String)}
 	 * 
 	 * @param encoded
 	 *            input
-	 * @return decoded result, i.e. original string encoded with {@link FileBasedDAOUtils#base64UrlEncode(String)}
+	 * @return decoded result, i.e. original string encoded with
+	 *         {@link FileBasedDAOUtils#base64UrlEncode(String)}
 	 * @throws IllegalArgumentException
-	 *             if the input is not a valid encoded string according to base64url encoding without padding
+	 *             if the input is not a valid encoded string according to
+	 *             base64url encoding without padding
 	 */
-	public static String base64UrlDecode(String encoded) throws IllegalArgumentException
+	public static String base64UrlDecode(String encoded)
+			throws IllegalArgumentException
 	{
-		return new String(BASE64URL_NO_PADDING_ENCODING.decode(encoded), StandardCharsets.UTF_8);
+		return new String(BASE64URL_NO_PADDING_ENCODING.decode(encoded),
+				StandardCharsets.UTF_8);
 	}
 
-	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null file arg");
+	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"Null file arg");
 
 	private FileBasedDAOUtils()
 	{
@@ -83,14 +103,17 @@ public final class FileBasedDAOUtils
 	 *             if
 	 *             {@code file == null || !file.exists() || !file.canRead() || (isdirectory && !file.isDirectory()) || (!isdirectory && file.isDirectory()) || (canwrite && !file.canWrite())}
 	 */
-	public static void checkFile(String friendlyname, File file, boolean isdirectory, boolean canwrite) throws IllegalArgumentException
+	public static void checkFile(String friendlyname, File file,
+			boolean isdirectory, boolean canwrite)
+			throws IllegalArgumentException
 	{
 		if (file == null)
 		{
 			throw NULL_FILE_ARGUMENT_EXCEPTION;
 		}
 
-		final String exStartMsg = friendlyname + " = '" + file.getAbsolutePath() + "' ";
+		final String exStartMsg = friendlyname + " = '"
+				+ file.getAbsolutePath() + "' ";
 		if (!file.exists())
 		{
 			throw new IllegalArgumentException(exStartMsg + "not found");
@@ -101,16 +124,132 @@ public final class FileBasedDAOUtils
 		}
 		if (isdirectory && !file.isDirectory())
 		{
-			throw new IllegalArgumentException(exStartMsg + "is not a directory");
+			throw new IllegalArgumentException(exStartMsg
+					+ "is not a directory");
 		}
 		if (!isdirectory && file.isDirectory())
 		{
-			throw new IllegalArgumentException(exStartMsg + "is not a normal file");
+			throw new IllegalArgumentException(exStartMsg
+					+ "is not a normal file");
 		}
 		if (canwrite && !file.canWrite())
 		{
-			throw new IllegalArgumentException(exStartMsg + "cannot be written to");
+			throw new IllegalArgumentException(exStartMsg
+					+ "cannot be written to");
 		}
+	}
+
+	private static class CopyingFileVisitor extends SimpleFileVisitor<Path>
+	{
+
+		private final Path source;
+		private final Path target;
+
+		private CopyingFileVisitor(Path source, Path target)
+		{
+			this.source = source;
+			this.target = target;
+		}
+
+		@Override
+		public FileVisitResult visitFile(Path file,
+				BasicFileAttributes attributes) throws IOException
+		{
+			Files.copy(file, target.resolve(source.relativize(file)));
+			return FileVisitResult.CONTINUE;
+		}
+
+		@Override
+		public FileVisitResult preVisitDirectory(Path directory,
+				BasicFileAttributes attributes) throws IOException
+		{
+			final Path targetDirectory = target.resolve(source
+					.relativize(directory));
+			try
+			{
+				Files.copy(directory, targetDirectory);
+			} catch (FileAlreadyExistsException e)
+			{
+				if (!Files.isDirectory(targetDirectory))
+				{
+					throw e;
+				}
+			}
+			return FileVisitResult.CONTINUE;
+		}
+	}
+
+	private static FileVisitor<Path> DELETING_FILE_VISITOR = new SimpleFileVisitor<Path>()
+	{
+		@Override
+		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+				throws IOException
+		{
+			Files.delete(file);
+			return FileVisitResult.CONTINUE;
+		}
+
+		@Override
+		public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+				throws IOException
+		{
+
+			if (exc == null)
+			{
+				Files.delete(dir);
+				return FileVisitResult.CONTINUE;
+			}
+
+			throw exc;
+		}
+	};
+
+	/**
+	 * Copy a directory recursively to another (does not follow links)
+	 * 
+	 * We could use commons-io library for this, if it were using the new
+	 * java.nio.file API available since Java 7, not the case so far.
+	 * 
+	 * @param source
+	 *            source directory
+	 * @param target
+	 *            target directory
+	 * @param maxDepth
+	 *            maximum number of levels of directories to copy. A value of 0
+	 *            means that only the starting directory is visited.
+	 * @throws IllegalArgumentException
+	 *             if the maxDepth parameter is negative
+	 * @throws IOException
+	 *             file copy error
+	 */
+	public static void copyDirectory(Path source, Path target, int maxDepth)
+			throws IOException, IllegalArgumentException
+	{
+		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(),
+				maxDepth, new CopyingFileVisitor(source, target));
+	}
+
+	/**
+	 * Delete a directory recursively
+	 * 
+	 * We could use commons-io library for this, if it were using the new
+	 * java.nio.file API available since Java 7, not the case so far.
+	 * 
+	 * @param dir
+	 *            directory
+	 * @param maxDepth
+	 *            maximum number of levels of directories to delete. A value of
+	 *            0 means that only the starting file is visited.
+	 * @throws IllegalArgumentException
+	 *             if the maxDepth parameter is negative
+	 * @throws IOException
+	 *             file deletion error
+	 */
+	public static void deleteDirectory(Path dir, int maxDepth)
+			throws IOException, IllegalArgumentException
+	{
+		Files.walkFileTree(dir, Collections.<FileVisitOption> emptySet(),
+				maxDepth, DELETING_FILE_VISITOR);
 	}
 
 	// public static void main(String[] args)
@@ -119,11 +258,15 @@ public final class FileBasedDAOUtils
 	// // String input = "mailto:herong_yang@yahoo.com";
 	//
 	// System.out.println("input: " + input);
-	// // FIXME: instead of google BaseEncoding, use java.util.Base64.getURLEncoder() when moving to Java 8
-	// final String encodedId = BaseEncoding.base64Url().omitPadding().encode(input.getBytes(StandardCharsets.UTF_8));
+	// // FIXME: instead of google BaseEncoding, use
+	// java.util.Base64.getURLEncoder() when moving to Java 8
+	// final String encodedId =
+	// BaseEncoding.base64Url().omitPadding().encode(input.getBytes(StandardCharsets.UTF_8));
 	// System.out.println("Encoded base64url (without padding): " + encodedId);
 	//
-	// final byte[] decoded = BaseEncoding.base64Url().omitPadding().decode(encodedId);
-	// System.out.println("Base64url-decoded (without padding): '" + new String(decoded, StandardCharsets.UTF_8) + "'");
+	// final byte[] decoded =
+	// BaseEncoding.base64Url().omitPadding().decode(encodedId);
+	// System.out.println("Base64url-decoded (without padding): '" + new
+	// String(decoded, StandardCharsets.UTF_8) + "'");
 	// }
 }

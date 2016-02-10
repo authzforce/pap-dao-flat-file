@@ -22,18 +22,19 @@ import org.ow2.authzforce.core.pap.api.dao.DomainDAO;
 import org.ow2.authzforce.core.pap.api.dao.PolicyDAOClient;
 import org.ow2.authzforce.core.pap.api.dao.PolicyVersionDAOClient;
 
-interface FileBasedDomainDAO<VERSION_DAO_CLIENT extends PolicyVersionDAOClient, POLICY_DAO_CLIENT extends PolicyDAOClient> extends
-		DomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>
+interface FileBasedDomainDAO<VERSION_DAO_CLIENT extends PolicyVersionDAOClient, POLICY_DAO_CLIENT extends PolicyDAOClient>
+		extends DomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>
 {
 
 	/**
-	 * Reload PDP from policy repository
+	 * Reload domain (PDP in particular) from domain directory
 	 * 
 	 * @throws IllegalArgumentException
-	 *             Invalid PDP configuration files (e.g. policies or PDP configuration)
+	 *             Invalid PDP configuration files (e.g. policies or PDP
+	 *             configuration)
 	 * @throws IOException
 	 *             Problem getting PDP configuration files from repository
 	 */
-	void reloadPDP() throws IOException, IllegalArgumentException;
+	void reload() throws IOException, IllegalArgumentException;
 
 }
