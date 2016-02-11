@@ -11,15 +11,17 @@
  */
 package org.ow2.authzforce.pap.dao.file;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystems;
 import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
@@ -103,7 +105,7 @@ public final class FileBasedDAOUtils
 	 *             if
 	 *             {@code file == null || !file.exists() || !file.canRead() || (isdirectory && !file.isDirectory()) || (!isdirectory && file.isDirectory()) || (canwrite && !file.canWrite())}
 	 */
-	public static void checkFile(String friendlyname, File file,
+	public static void checkFile(String friendlyname, Path file,
 			boolean isdirectory, boolean canwrite)
 			throws IllegalArgumentException
 	{
@@ -112,30 +114,60 @@ public final class FileBasedDAOUtils
 			throw NULL_FILE_ARGUMENT_EXCEPTION;
 		}
 
-		final String exStartMsg = friendlyname + " = '"
-				+ file.getAbsolutePath() + "' ";
-		if (!file.exists())
+		final String exStartMsg = friendlyname + " = '" + file.toAbsolutePath()
+				+ "' ";
+		if (!Files.exists(file))
 		{
 			throw new IllegalArgumentException(exStartMsg + "not found");
 		}
-		if (!file.canRead())
+		if (!Files.isReadable(file))
 		{
 			throw new IllegalArgumentException(exStartMsg + "cannot be read");
 		}
-		if (isdirectory && !file.isDirectory())
+		if (isdirectory && !Files.isDirectory(file))
 		{
 			throw new IllegalArgumentException(exStartMsg
 					+ "is not a directory");
 		}
-		if (!isdirectory && file.isDirectory())
+		if (!isdirectory && !Files.isDirectory(file))
 		{
 			throw new IllegalArgumentException(exStartMsg
 					+ "is not a normal file");
 		}
-		if (canwrite && !file.canWrite())
+		if (canwrite && !Files.isWritable(file))
 		{
 			throw new IllegalArgumentException(exStartMsg
 					+ "cannot be written to");
+		}
+	}
+	
+	/**
+	 * Directory entry filter that accepts only regular files with a given
+	 * extension/suffix
+	 *
+	 */
+	public static final class SuffixMatchingDirectoryStreamFilter implements
+			DirectoryStream.Filter<Path>
+	{
+		private final PathMatcher pathSuffixMatcher;
+
+		/**
+		 * Creates filter from a filename extension/suffix
+		 * 
+		 * @param suffix
+		 *            filename suffix to be matched
+		 */
+		public SuffixMatchingDirectoryStreamFilter(String suffix)
+		{
+			this.pathSuffixMatcher = FileSystems.getDefault().getPathMatcher(
+					"glob:*" + suffix);
+		}
+
+		@Override
+		public boolean accept(Path entry) throws IOException
+		{
+			return Files.isRegularFile(entry) && Files.isReadable(entry)
+					&& pathSuffixMatcher.matches(entry);
 		}
 	}
 
