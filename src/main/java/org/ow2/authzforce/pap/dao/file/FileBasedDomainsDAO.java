@@ -1162,8 +1162,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 						final PolicyVersion version = oldestToLatestVersionIterator
 								.next();
 						// remove only if not required
-						if (requiredPolicyVersion != null
-								&& version.equals(requiredPolicyVersion))
+						if (version.equals(requiredPolicyVersion))
 						{
 							continue;
 						}
