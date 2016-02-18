@@ -371,6 +371,10 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 	/**
 	 * Maps domainId to domain
+	 * 
+	 * FIXME: add externalId as value to allow finding externalId quickly and
+	 * remove from domainIDsByExternalId, when the domain directory has been
+	 * removed (so no way to recover externalId from repository)
 	 */
 	private final ConcurrentMap<String, DOMAIN_DAO_CLIENT> domainMap = new ConcurrentHashMap<>();
 
@@ -1682,6 +1686,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 					for (final WatchEvent<?> event : key.pollEvents())
 					{
 						final WatchEvent.Kind<?> kind = event.kind();
+						// To retrieve the path attached to the Key:
+						// Path dir = (Path) key.watchable();
 
 						if (kind == OVERFLOW)
 						{
@@ -1709,6 +1715,11 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 						{
 							// registerAll(child);
 							addWatchedDirectory(childAbsPath);
+							// FIXME: if domain directory, add directories
+							// recursively, 'policies', 'policies/*', etc. (see
+							// WatchDir.java example from
+							// Oracle)
+
 						}
 
 						// MONITORING DOMAIN FOLDERS
