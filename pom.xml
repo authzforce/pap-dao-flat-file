@@ -5,10 +5,10 @@
 		<artifactId>authzforce-ce-parent</artifactId>
 		<version>3.3.7</version>
 	</parent>
-	<artifactId>authzforce-ce-pap-dao-file</artifactId>
+	<artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
 	<version>4.0.0-SNAPSHOT</version>
 	<name>${project.groupId}:${project.artifactId}</name>
-	<description>AuthZForce CE - File-based PAP DAO implementation</description>
+	<description>AuthZForce CE - PAP DAO implementation based on flat file database</description>
 	<url>https://tuleap.ow2.org/projects/authzforce</url>
 	<scm>
 		<connection>scm:git:${git.url.base}/pap-dao-file.git</connection>
