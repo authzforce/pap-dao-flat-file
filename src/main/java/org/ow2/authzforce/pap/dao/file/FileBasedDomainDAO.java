@@ -27,6 +27,12 @@ interface FileBasedDomainDAO<VERSION_DAO_CLIENT extends PolicyVersionDAOClient, 
 {
 
 	/**
+	 * Get domain's external ID (set by provisioning client)
+	 * @return external ID
+	 */
+	String getExternalId();
+	
+	/**
 	 * Reload domain (PDP in particular) from domain directory
 	 * 
 	 * @throws IllegalArgumentException

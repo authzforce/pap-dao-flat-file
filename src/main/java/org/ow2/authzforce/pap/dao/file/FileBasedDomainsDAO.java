@@ -192,6 +192,10 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	private static final TreeSet<PolicyVersion> EMPTY_TREE_SET = new TreeSet<>();
 	private static final IllegalArgumentException NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException(
 			"Null domain properties arg");
+	private static final IllegalArgumentException NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"Null domain PDP properties arg");
+	private static final IllegalArgumentException NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"Invalid domain PDP properties arg: rootPolicyRef undefined");
 	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException(
 			"Null attributeProviders arg");
 
@@ -327,11 +331,17 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	 * @param domainId
 	 *            ID of domain to be removed
 	 */
-	private void removeDomainFromMapsOnly(String domainId, String externalId) throws IOException {
+	private void removeDomainFromMapsOnly(String domainId) throws IOException {
 		assert domainId != null;
 
 		synchronized (domainsRootDir) {
-			domainMap.remove(domainId);
+			final DOMAIN_DAO_CLIENT domain = domainMap.remove(domainId);
+			if(domain == null) {
+				// already removed
+				return;
+			}
+			
+			final String externalId = domain.getDAO().getExternalId();
 			if (externalId != null) {
 				domainIDsByExternalId.remove(externalId);
 			}
@@ -412,7 +422,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		 */
 		private volatile long lastExternalIdSyncedTime = 0;
 
-		private volatile String externalId = null;
+		private volatile String cachedExternalId = null;
 
 		private volatile PDPImpl pdp = null;
 
@@ -465,7 +475,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 			// Get policy directory from PDP conf
 			// (refPolicyProvider/policyLocation pattern)
-			final Pdp pdpConf = getPDPConfTmpl();
+			final Pdp pdpConf = loadPDPConfTmpl();
 
 			// Get the refpolicies parent directory and suffix from PDP conf
 			// (refPolicyProvider)
@@ -523,9 +533,24 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 		}
 
-		private void reloadPDP() throws IOException, IllegalArgumentException {
-			// FIXME: set lastPdpSyncedTime
+		@Override
+		public String getExternalId() {
+			return this.cachedExternalId;
+		}
 
+
+
+		/**
+		 * Reload PDP from configuration files, (including policy files, aka
+		 * "PRP" in XACML)
+		 * 
+		 * @throws IOException
+		 *             I/O error reading from confFile
+		 * @throws IllegalArgumentException
+		 *             Invalid PDP configuration in confFile
+		 */
+		private void reloadPDP() throws IOException, IllegalArgumentException {
+			lastPdpSyncedTime = System.currentTimeMillis();
 			// test if PDP conf valid, and update the domain's PDP only if valid
 			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfFile, pdpModelHandler);
 			// did not throw exception, so valid
@@ -550,12 +575,14 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			synchronized (domainDirPath) {
 				lastExternalIdSyncedTime = System.currentTimeMillis();
 				final DomainProperties props = loadProperties();
-				updateExternalIdCache(props.getExternalId());
+				updateCachedExternalId(props.getExternalId());
 				reloadPDP();
 			}
 		}
 
 		/**
+		 * Reload PDP with input JAXB conf, and persist conf to file if PDP
+		 * reloaded successfully
 		 * 
 		 * @param pdpConfTemplate
 		 *            original PDP configuration template from file, i.e. before
@@ -565,9 +592,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		 * @throws IllegalArgumentException
 		 * @throws IOException
 		 */
-		private void updatePDP(Pdp pdpConfTmpl) throws IllegalArgumentException, IOException {
-			// FIXME: make sure lastPdpLoadtime is set before reading
-			// pdpConfTmpl arg passed to this
+		private void reloadPDP(Pdp pdpConfTmpl) throws IllegalArgumentException, IOException {
 			// test if PDP conf valid, and update the domain's PDP only if valid
 			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfTmpl, pdpConfEnvProps);
 			// did not throw exception, so valid
@@ -639,21 +664,21 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		 * @param newExternalId
 		 */
 		private void updateCachedExternalId(String newExternalId) {
-			if (externalId == null) {
+			if (cachedExternalId == null) {
 				// externalId not previously set
 				if (newExternalId != null) {
 					domainIDsByExternalId.put(newExternalId, domainId);
 
 				}
-			} else if (!externalId.equals(newExternalId)) {
+			} else if (!cachedExternalId.equals(newExternalId)) {
 				// externalId was set and has changed or unset
-				domainIDsByExternalId.remove(externalId);
+				domainIDsByExternalId.remove(cachedExternalId);
 				if (newExternalId != null) {
 					domainIDsByExternalId.put(newExternalId, domainId);
 				}
 			}
 
-			externalId = newExternalId;
+			cachedExternalId = newExternalId;
 		}
 
 		@Override
@@ -684,8 +709,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 			final DomainProperties props;
 			synchronized (domainDirPath) {
-				final long lastModified = propFile.lastModified();
-				final boolean isFileModified = lastModified > lastExternalIdSyncedTime;
+				final long lastModifiedTime = propFile.lastModified();
+				final boolean isFileModified = lastModifiedTime > lastExternalIdSyncedTime;
 				// let's sync
 				lastExternalIdSyncedTime = System.currentTimeMillis();
 				props = loadProperties();
@@ -715,13 +740,73 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 		}
 
+		/**
+		 * Reload PDP only if a change to one of PDP files (main configuration,
+		 * policies...) has been detected. Should be called inside a
+		 * synchronized(domainDirPath) block
+		 * 
+		 * @return true iff PDP was actually changed by synchronization
+		 *         (reloaded)
+		 * @throws IOException
+		 * @throws IllegalArgumentException
+		 */
+		private boolean syncPDP() throws IllegalArgumentException, IOException {
+			// Check for change in PDP's main conf file
+			final long pdpConfLastModifiedTime = pdpConfFile.lastModified();
+			if (pdpConfLastModifiedTime > lastPdpSyncedTime) {
+				reloadPDP();
+				return true;
+			}
+
+			// check for changes in PDP active policies
+			final Map<String, PolicyVersion> usedPolicies = pdp.getStaticRootAndRefPolicies();
+			if (usedPolicies == null) {
+				throw NON_STATIC_POLICY_EXCEPTION;
+			}
+
+			for (final Entry<String, PolicyVersion> usedPolicy : usedPolicies.entrySet()) {
+				final Path policyPath = getPolicyVersionPath(usedPolicy.getKey(), usedPolicy.getValue());
+				if (!Files.exists(policyPath, LinkOption.NOFOLLOW_LINKS)) {
+					// used policy file removed, this is a significant change
+					reloadPDP();
+					return true;
+				}
+
+				// used policy file is there, checked whether changed since last
+				// sync
+				final long policyLastModifiedTime = Files.getLastModifiedTime(policyPath, LinkOption.NOFOLLOW_LINKS)
+						.toMillis();
+				if (policyLastModifiedTime > lastPdpSyncedTime) {
+					reloadPDP();
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		@Override
 		public ReadablePdpProperties setOtherPdpProperties(WritablePdpProperties properties)
 				throws IOException, IllegalArgumentException {
+			if (properties == null) {
+				throw NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION;
+			}
+
+			final IdReferenceType newRootPolicyRef = properties.getRootPolicyRef();
+			if (newRootPolicyRef == null) {
+				throw NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION;
+			}
+
+			final long lastPdpSyncedTimeCopy;
+			final List<IdReferenceType> matchedPolicyRefs;
 			synchronized (domainDirPath) {
+				lastPdpSyncedTime = System.currentTimeMillis();
 				// Get current PDP conf that we have to change (only part of it)
 				final Pdp pdpConf = loadPDPConfTmpl();
-				// Validate the PDP with new rootPolicyRef first if there is any
+				/*
+				 * First check whether rootPolicyRef is the same/unchanged to
+				 * avoid useless PDP reload (loading a new PDP is costly)
+				 */
 				final AbstractPolicyProvider rootPolicyProvider = pdpConf.getRootPolicyProvider();
 				if (!(rootPolicyProvider instanceof StaticRefBasedRootPolicyProvider)) {
 					// critical error
@@ -731,16 +816,15 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				}
 
 				final StaticRefBasedRootPolicyProvider staticRefBasedRootPolicyProvider = (StaticRefBasedRootPolicyProvider) rootPolicyProvider;
-				// Do nothing if rootPolicyRef is the same/unchanged (loading a
-				// new
-				// PDP is costly)
-				if (rootPolicyRef != null && !rootPolicyRef.equals(staticRefBasedRootPolicyProvider.getPolicyRef())) {
-					// new rootPolicyRef different from old
-					staticRefBasedRootPolicyProvider.setPolicyRef(rootPolicyRef);
-					updatePDP(pdpConf);
-				} else if (pdp == null) {
-					// PDP not yet instantiated
-					updatePDP(pdpConf);
+				// If rootPolicyRef changed, validate/reload the PDP with new
+				// rootPolicyRef
+				if (!newRootPolicyRef.equals(staticRefBasedRootPolicyProvider.getPolicyRef())) {
+					staticRefBasedRootPolicyProvider.setPolicyRef(newRootPolicyRef);
+					reloadPDP(pdpConf);
+				} else {
+					// no reload but we sill need to sync PDP to make sure
+					// pdp.getStaticRootAndRefPolicies() is up-to-date
+					syncPDP();
 				}
 
 				final Map<String, PolicyVersion> pdpEnabledPolicyMap = pdp.getStaticRootAndRefPolicies();
@@ -748,24 +832,39 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 					throw NON_STATIC_POLICY_EXCEPTION;
 				}
 
-				final List<IdReferenceType> matchedPolicyRefs = new ArrayList<>();
+				matchedPolicyRefs = new ArrayList<>();
 				for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpEnabledPolicyMap.entrySet()) {
 					matchedPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(),
 							enabledPolicyEntry.getValue().toString(), null, null));
 				}
+
+				/*
+				 * lastPdpSyncedTime is not final, therefore we make a defensive
+				 * copy of the current value of lastPdpSyncedTime before
+				 * returning in case another thread messes with it after we quit
+				 * the synchronized block. This is a primitive type, so
+				 * assignment copies the value.
+				 */
+				lastPdpSyncedTimeCopy = lastPdpSyncedTime;
 			}
 
-			return new ReadablePdpPropertiesImpl(staticRefBasedRootPolicyProvider.getPolicyRef(), lastPdpLoadTime,
-					matchedPolicyRefs);
+			return new ReadablePdpPropertiesImpl(newRootPolicyRef, lastPdpSyncedTimeCopy, matchedPolicyRefs);
 		}
 
 		@Override
 		public ReadablePdpProperties getOtherPdpProperties() throws IOException {
 
+			final long lastPdpSyncedTimeCopy;
+			final AbstractPolicyProvider rootPolicyProvider;
+			final List<IdReferenceType> matchedPolicyRefs;
 			synchronized (domainDirPath) {
-				// Get rootPolicyRef from PDP conf
+				final long lastModifiedTime = pdpConfFile.lastModified();
+				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
+				// let's sync
+				lastPdpSyncedTime = System.currentTimeMillis();
+				// Get current PDP conf that we have to change (only part of it)
 				final Pdp pdpConf = loadPDPConfTmpl();
-				final AbstractPolicyProvider rootPolicyProvider = pdpConf.getRootPolicyProvider();
+				rootPolicyProvider = pdpConf.getRootPolicyProvider();
 				if (!(rootPolicyProvider instanceof StaticRefBasedRootPolicyProvider)) {
 					// critical error
 					throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "'"
@@ -773,21 +872,36 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 							+ " as expected.");
 				}
 
-				final StaticRefBasedRootPolicyProvider staticRefBasedRootPolicyProvider = (StaticRefBasedRootPolicyProvider) rootPolicyProvider;
+				if (isFileModified) {
+					reloadPDP(pdpConf);
+				} else {
+					syncPDP();
+				}
+
 				final Map<String, PolicyVersion> pdpEnabledPolicyMap = pdp.getStaticRootAndRefPolicies();
 				if (pdpEnabledPolicyMap == null) {
 					throw NON_STATIC_POLICY_EXCEPTION;
 				}
 
-				final List<IdReferenceType> matchedPolicyRefs = new ArrayList<>();
+				matchedPolicyRefs = new ArrayList<>();
 				for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpEnabledPolicyMap.entrySet()) {
 					matchedPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(),
 							enabledPolicyEntry.getValue().toString(), null, null));
 				}
 
-				return new ReadablePdpPropertiesImpl(staticRefBasedRootPolicyProvider.getPolicyRef(), lastPdpLoadTime,
-						matchedPolicyRefs);
+				/*
+				 * lastPdpSyncedTime is not final, therefore we make a defensive
+				 * copy of the current value of lastPdpSyncedTime before
+				 * returning in case another thread messes with it after we quit
+				 * the synchronized block. This is a primitive type, so
+				 * assignment copies the value.
+				 */
+				lastPdpSyncedTimeCopy = lastPdpSyncedTime;
 			}
+
+			final StaticRefBasedRootPolicyProvider staticRefBasedRootPolicyProvider = (StaticRefBasedRootPolicyProvider) rootPolicyProvider;
+			return new ReadablePdpPropertiesImpl(staticRefBasedRootPolicyProvider.getPolicyRef(), lastPdpSyncedTimeCopy,
+					matchedPolicyRefs);
 		}
 
 		/**
@@ -800,18 +914,6 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			return this.pdp;
 		}
 
-		/**
-		 * Get domain PDP attribute providers
-		 * 
-		 * @return attribute providers
-		 * @throws IOException
-		 */
-		@Override
-		public List<AbstractAttributeProvider> getAttributeProviders() throws IOException {
-			final Pdp pdpConf = getPDPConfTmpl();
-			return pdpConf.getAttributeProviders();
-		}
-
 		@Override
 		public List<AbstractAttributeProvider> setAttributeProviders(List<AbstractAttributeProvider> attributeproviders)
 				throws IOException, IllegalArgumentException {
@@ -822,49 +924,39 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			// Synchronize changes on PDP (and other domain conf data) from
 			// multiple threads, keep minimal things in the synchronized block
 			synchronized (domainDirPath) {
-				final Pdp pdpConf = getPDPConfTmpl();
+				lastPdpSyncedTime = System.currentTimeMillis();
+				final Pdp pdpConf = loadPDPConfTmpl();
 				pdpConf.getAttributeProviders().clear();
 				pdpConf.getAttributeProviders().addAll(attributeproviders);
-				updatePDP(pdpConf);
+				reloadPDP(pdpConf);
 			}
 
 			return attributeproviders;
 		}
 
+		/**
+		 * Get domain PDP attribute providers
+		 * 
+		 * @return attribute providers
+		 * @throws IOException
+		 */
 		@Override
-		public Set<String> getPolicyIDs() throws IOException {
-			/*
-			 * We could cache this, but note that caching may be taking place
-			 * upfront already. For instance, if this is used behind a HTTP API,
-			 * the result may be cached by the HTTP server or web framework
-			 * already. For instance, you can enable server-side caching in CXF
-			 * JAXRS framework with Ehcache-web. Also this is meant to be used
-			 * as a DAO in a REST API, i.e. the API should be stateless as much
-			 * as possible. Therefore, we should avoid caching when performance
-			 * is not critical (the performance-critical part is getPDP() only).
-			 * Also this should be in sync as much as possible with the
-			 * filesystem.
-			 */
-			final Set<String> policyIds = new HashSet<>();
-			try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath,
-					DIRECTORY_FILTER)) {
-				for (final Path policyDirPath : policyParentDirStream) {
-					final String policyDirName = policyDirPath.getFileName().toString();
-					final String policyId;
-					try {
-						policyId = FileBasedDAOUtils.base64UrlDecode(policyDirName);
-					} catch (IllegalArgumentException e) {
-						throw new RuntimeException("Invalid policy directory name (bad encoding): " + policyDirName);
-					}
-
-					policyIds.add(policyId);
+		public List<AbstractAttributeProvider> getAttributeProviders() throws IOException {
+			// Synchronize changes on PDP (and other domain conf data) from
+			// multiple threads, keep minimal things in the synchronized block
+			final Pdp pdpConf;
+			synchronized (domainDirPath) {
+				final long lastModifiedTime = pdpConfFile.lastModified();
+				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
+				// let's sync
+				lastPdpSyncedTime = System.currentTimeMillis();
+				pdpConf = loadPDPConfTmpl();
+				if (isFileModified) {
+					reloadPDP(pdpConf);
 				}
-			} catch (IOException e) {
-				throw new IOException("Error listing files in policies directory '" + policyParentDirPath
-						+ "' of domain '" + domainId + "'", e);
 			}
 
-			return policyIds;
+			return pdpConf.getAttributeProviders();
 		}
 
 		/**
@@ -880,68 +972,52 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			return this.policyParentDirPath.resolve(policyDirName);
 		}
 
-		private Path getPolicyVersionPath(Path policyDirPath, PolicyVersion version) {
-			return policyDirPath.resolve(version + policyFilenameSuffix);
-		}
+		/**
+		 * Get/load policy from file
+		 * 
+		 * @param policyFile
+		 * @return policy; null if policyFile does not exists or is not a file
+		 * @throws IOException
+		 */
+		private PolicySet loadPolicy(File policyFile) throws IOException {
+			assert policyFile != null;
 
-		private Path getPolicyVersionPath(String policyId, PolicyVersion versionId) {
-			return getPolicyDirectory(policyId).resolve(versionId + policyFilenameSuffix);
+			if (!policyFile.exists() || !policyFile.isFile()) {
+				return null;
+			}
+
+			final JAXBElement<PolicySet> policyElt;
+			try {
+				final Unmarshaller unmarshaller = JaxbXACMLUtils.createXacml3Unmarshaller();
+				policyElt = unmarshaller.unmarshal(new StreamSource(policyFile), PolicySet.class);
+			} catch (JAXBException e) {
+				throw new IOException("Error getting a policy of domain '" + domainId + "'", e);
+			}
+
+			return policyElt.getValue();
 		}
 
 		/**
-		 * Get policy versions from policy directory, ordered from latest to
-		 * oldest
+		 * Save/write policy to file
 		 * 
-		 * @param policyDirPath
-		 * @return versions; empty if directory does not exist or is not a
-		 *         directory
+		 * @param file
+		 *            target file
 		 * @throws IOException
 		 */
-		private NavigableSet<PolicyVersion> getPolicyVersions(Path policyDirPath) throws IOException {
-			assert policyDirPath != null;
+		private void savePolicy(PolicySet policy, File file) throws IOException {
+			assert policy != null;
+			assert file != null;
 
-			if (!Files.exists(policyDirPath) || !Files.isDirectory(policyDirPath)) {
-				return EMPTY_TREE_SET;
+			try {
+				final Marshaller marshaller = JaxbXACMLUtils.createXacml3Marshaller();
+				marshaller.marshal(policy, file);
+			} catch (JAXBException e) {
+				throw new IOException("Error saving policy in domain '" + domainId + "'", e);
 			}
-
-			final TreeSet<PolicyVersion> versions = new TreeSet<>(Collections.reverseOrder());
-			try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath,
-					policyFilePathFilter)) {
-				for (final Path policyVersionFilePath : policyDirStream) {
-					final String versionPlusSuffix = policyVersionFilePath.getFileName().toString();
-					final String versionId = versionPlusSuffix.substring(0,
-							versionPlusSuffix.length() - policyFilenameSuffix.length());
-					final PolicyVersion version = new PolicyVersion(versionId);
-					versions.add(version);
-				}
-			} catch (IOException e) {
-				throw new IOException("Error listing policy version files in policy directory '" + policyDirPath
-						+ "' of domain '" + domainId + "'", e);
-			}
-
-			return versions;
 		}
 
-		@Override
-		public NavigableSet<PolicyVersion> getPolicyVersions(String policyId) throws IOException {
-			if (policyId == null) {
-				return EMPTY_TREE_SET;
-			}
-
-			/*
-			 * We could cache this, but note that caching may be taking place
-			 * upfront already. For instance, if this is used behind a HTTP API,
-			 * the result may be cached by the HTTP server or web framework
-			 * already. For instance, you can enable server-side caching in CXF
-			 * JAXRS framework with Ehcache-web. Also this is meant to be used
-			 * as a DAO in a REST API, i.e. the API should be stateless as much
-			 * as possible. Therefore, we should avoid caching when performance
-			 * is not critical (the performance-critical part is getPDP() only).
-			 * Also this should be in sync as much as possible with the
-			 * filesystem.
-			 */
-			final Path policyDir = getPolicyDirectory(policyId);
-			return getPolicyVersions(policyDir);
+		private Path getPolicyVersionPath(Path policyDirPath, PolicyVersion version) {
+			return policyDirPath.resolve(version + policyFilenameSuffix);
 		}
 
 		@Override
@@ -961,7 +1037,10 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 					/*
 					 * conflict: same policy version already exists, return it
 					 */
-					return getPolicy(policyVersionFile);
+					// make sure the PDP is in sync with the returned policy
+					// version
+					syncPDP();
+					return loadPolicy(policyVersionFile);
 				}
 
 				/*
@@ -1030,11 +1109,21 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 					excessOfPolicyVersionsToBeRemoved = 0;
 				}
 
-				writePolicy(policySet, policyVersionFile);
+				savePolicy(policySet, policyVersionFile);
 
-				// Reload PDP iff the PDP depends on the policy updated here
+				/*
+				 * Reload PDP iff the PDP depends on the policy updated here
+				 * (e.g. we are changing the latest policy version, and our PDP
+				 * implementation uses the latest version if no specific version
+				 * is specified)
+				 */
+				// Let's sync the PDP first before we check the actual active
+				// policies
+				syncPDP();
 				final PolicyVersion requiredPolicyVersion = pdp.getStaticRootAndRefPolicies().get(policyId);
-				if (requiredPolicyVersion != null) {
+				if (requiredPolicyVersion == null) {
+					// the added policy is not used by the PDP
+				} else {
 					try {
 						reloadPDP();
 					} catch (Throwable e) {
@@ -1086,112 +1175,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			return null;
 		}
 
-		@Override
-		public ReadableDomainProperties removeDomain() throws IOException {
-			final ReadableDomainProperties domainProps;
-			synchronized (domainDirPath) {
-				domainProps = getDomainProperties();
-				FileBasedDAOUtils.deleteDirectory(domainDirPath, 2);
-				if (pdp != null) {
-					pdp.close();
-				}
-
-				removeDomainFromMapsOnly(domainProps.getInternalId(), domainProps.getExternalId());
-			}
-
-			return domainProps;
-		}
-
-		@Override
-		public POLICY_DAO_CLIENT getPolicyDAOClient(String policyId) {
-			if (policyId == null) {
-				return null;
-			}
-
-			return policyDAOClientFactory.getInstance(policyId, this);
-		}
-
-		@Override
-		public NavigableSet<PolicyVersion> removePolicy(String policyId) throws IOException, IllegalArgumentException {
-			if (policyId == null) {
-				return EMPTY_TREE_SET;
-			}
-
-			final PolicyVersion requiredPolicyVersion;
-			final NavigableSet<PolicyVersion> versions;
-			synchronized (domainDirPath) {
-				requiredPolicyVersion = pdp.getStaticRootAndRefPolicies().get(policyId);
-				if (requiredPolicyVersion != null) {
-					throw new IllegalArgumentException("Policy '" + policyId
-							+ "' cannot be removed because this policy (version " + requiredPolicyVersion
-							+ ") is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
-				}
-
-				versions = getPolicyVersions(policyId);
-				final Path policyDir = getPolicyDirectory(policyId);
-				try {
-					// if directory does not exist, this method just returns
-					// right away
-					FileBasedDAOUtils.deleteDirectory(policyDir, 0);
-				} catch (IOException e) {
-					throw new IOException("Error removing policy directory: " + policyDir);
-				}
-			}
-
-			return versions;
-		}
-
-		@Override
-		public VERSION_DAO_CLIENT getVersionDAOClient(String policyId, PolicyVersion version) {
-			if (policyId == null || version == null) {
-				return null;
-			}
-
-			return policyVersionDAOClientFactory.getInstance(policyId, version, this);
-		}
-
-		/**
-		 * Get policy from file
-		 * 
-		 * @param policyFile
-		 * @return policy; null if policyFile does not exists or is not a file
-		 * @throws IOException
-		 */
-		private PolicySet getPolicy(File policyFile) throws IOException {
-			assert policyFile != null;
-
-			if (!policyFile.exists() || !policyFile.isFile()) {
-				return null;
-			}
-
-			final JAXBElement<PolicySet> policyElt;
-			try {
-				final Unmarshaller unmarshaller = JaxbXACMLUtils.createXacml3Unmarshaller();
-				policyElt = unmarshaller.unmarshal(new StreamSource(policyFile), PolicySet.class);
-			} catch (JAXBException e) {
-				throw new IOException("Error getting a policy of domain '" + domainId + "'", e);
-			}
-
-			return policyElt.getValue();
-		}
-
-		/**
-		 * Write policy to file
-		 * 
-		 * @param file
-		 *            target file
-		 * @throws IOException
-		 */
-		private void writePolicy(PolicySet policy, File file) throws IOException {
-			assert policy != null;
-			assert file != null;
-
-			try {
-				final Marshaller marshaller = JaxbXACMLUtils.createXacml3Marshaller();
-				marshaller.marshal(policy, file);
-			} catch (JAXBException e) {
-				throw new IOException("Error saving policy in domain '" + domainId + "'", e);
-			}
+		private Path getPolicyVersionPath(String policyId, PolicyVersion versionId) {
+			return getPolicyDirectory(policyId).resolve(versionId + policyFilenameSuffix);
 		}
 
 		@Override
@@ -1199,52 +1184,14 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			if (policyId == null || version == null) {
 				return null;
 			}
-
-			final Path policyVersionFilePath = getPolicyVersionPath(policyId, version);
-			return getPolicy(policyVersionFilePath.toFile());
-		}
-
-		@Override
-		public PolicyVersion getLatestPolicyVersionId(String policyId) throws IOException {
-			if (policyId == null) {
-				return null;
-			}
-
 			/*
-			 * We could cache this, but note that caching may be taking place
-			 * upfront already. For instance, if this is used behind a HTTP API,
-			 * the result may be cached by the HTTP server or web framework
-			 * already. For instance, you can enable server-side caching in CXF
-			 * JAXRS framework with Ehcache-web. Also this is meant to be used
-			 * as a DAO in a REST API, i.e. the API should be stateless as much
-			 * as possible. Therefore, we should avoid caching when performance
-			 * is not critical (the performance-critical part is getPDP() only).
-			 * Also this should be in sync as much as possible with the
-			 * filesystem.
+			 * Make sure the PDP is in sync with the returned policy version
 			 */
-			final Path policyDirPath = getPolicyDirectory(policyId);
-			if (!Files.exists(policyDirPath) || !Files.isDirectory(policyDirPath)) {
-				return null;
+			synchronized (domainDirPath) {
+				syncPDP();
+				final File policyVersionFile = getPolicyVersionPath(policyId, version).toFile();
+				return loadPolicy(policyVersionFile);
 			}
-
-			PolicyVersion latestVersion = null;
-			try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath,
-					policyFilePathFilter)) {
-				for (final Path policyVersionFilePath : policyDirStream) {
-					final String versionPlusSuffix = policyVersionFilePath.getFileName().toString();
-					final String versionId = versionPlusSuffix.substring(0,
-							versionPlusSuffix.length() - policyFilenameSuffix.length());
-					final PolicyVersion version = new PolicyVersion(versionId);
-					if (latestVersion == null || latestVersion.compareTo(version) < 0) {
-						latestVersion = version;
-					}
-				}
-			} catch (IOException e) {
-				throw new IOException("Error listing policy version files in policy directory '" + policyDirPath
-						+ "' of domain '" + domainId + "'", e);
-			}
-
-			return latestVersion;
 		}
 
 		@Override
@@ -1255,21 +1202,28 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 
 			final File policyVersionFile = getPolicyVersionPath(policyId, version).toFile();
-
 			final PolicySet policy;
 			synchronized (domainDirPath) {
-				policy = getPolicy(policyVersionFile);
-				if (policy == null) {
-					return null;
-				}
-
+				/*
+				 * Check whether it is not used by the PDP. First make sure the
+				 * PDP is up-to-date with the repository
+				 */
+				syncPDP();
 				final PolicyVersion requiredPolicyVersion = pdp.getStaticRootAndRefPolicies().get(policyId);
 				if (requiredPolicyVersion != null && requiredPolicyVersion.equals(version)) {
 					throw new IllegalArgumentException("Policy '" + policyId + "' / Version " + version
 							+ " cannot be removed because it is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
 				}
 
+				policy = loadPolicy(policyVersionFile);
+				// if there is no such policy version, nothing to remove
+				if (policy == null) {
+					return null;
+				}
+
 				if (policyVersionFile.delete()) {
+					// Check whether the policy directory is left empty (no more
+					// version)
 					final Path policyDirPath = policyVersionFile.getParentFile().toPath();
 					try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath,
 							policyFilePathFilter)) {
@@ -1290,6 +1244,214 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 
 			return policy;
+		}
+
+		@Override
+		public VERSION_DAO_CLIENT getVersionDAOClient(String policyId, PolicyVersion version) {
+			if (policyId == null || version == null) {
+				return null;
+			}
+
+			return policyVersionDAOClientFactory.getInstance(policyId, version, this);
+		}
+
+		@Override
+		public PolicyVersion getLatestPolicyVersionId(String policyId) throws IOException {
+			if (policyId == null) {
+				return null;
+			}
+
+			/*
+			 * We could cache this, but this is meant to be used as a DAO in a
+			 * REST API, i.e. the API should be stateless as much as possible.
+			 * Therefore, we should avoid caching when performance is not
+			 * critical (the performance-critical part is getPDP() only). Also
+			 * this should be in sync as much as possible with the filesystem.
+			 */
+			/*
+			 * Make sure the PDP is in sync/consistent with the info returned
+			 * (last version)
+			 */
+			PolicyVersion latestVersion = null;
+			synchronized (domainDirPath) {
+				final Path policyDirPath = getPolicyDirectory(policyId);
+				if (!Files.exists(policyDirPath) || !Files.isDirectory(policyDirPath)) {
+					return null;
+				}
+
+				try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath,
+						policyFilePathFilter)) {
+					for (final Path policyVersionFilePath : policyDirStream) {
+						final String versionPlusSuffix = policyVersionFilePath.getFileName().toString();
+						final String versionId = versionPlusSuffix.substring(0,
+								versionPlusSuffix.length() - policyFilenameSuffix.length());
+						final PolicyVersion version = new PolicyVersion(versionId);
+						if (latestVersion == null || latestVersion.compareTo(version) < 0) {
+							latestVersion = version;
+						}
+					}
+				} catch (IOException e) {
+					throw new IOException("Error listing policy version files in policy directory '" + policyDirPath
+							+ "' of domain '" + domainId + "'", e);
+				}
+
+				// Sync the PDP with info returned
+				syncPDP();
+			}
+
+			return latestVersion;
+		}
+
+		/**
+		 * Get policy versions from policy directory, ordered from latest to
+		 * oldest
+		 * 
+		 * @param policyDirPath
+		 * @return versions; empty if directory does not exist or is not a
+		 *         directory
+		 * @throws IOException
+		 */
+		private NavigableSet<PolicyVersion> getPolicyVersions(Path policyDirPath) throws IOException {
+			assert policyDirPath != null;
+
+			if (!Files.exists(policyDirPath) || !Files.isDirectory(policyDirPath)) {
+				return EMPTY_TREE_SET;
+			}
+
+			final TreeSet<PolicyVersion> versions = new TreeSet<>(Collections.reverseOrder());
+			try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath,
+					policyFilePathFilter)) {
+				for (final Path policyVersionFilePath : policyDirStream) {
+					final String versionPlusSuffix = policyVersionFilePath.getFileName().toString();
+					final String versionId = versionPlusSuffix.substring(0,
+							versionPlusSuffix.length() - policyFilenameSuffix.length());
+					final PolicyVersion version = new PolicyVersion(versionId);
+					versions.add(version);
+				}
+			} catch (IOException e) {
+				throw new IOException("Error listing policy version files in policy directory '" + policyDirPath
+						+ "' of domain '" + domainId + "'", e);
+			}
+
+			return versions;
+		}
+
+		@Override
+		public NavigableSet<PolicyVersion> getPolicyVersions(String policyId) throws IOException {
+			if (policyId == null) {
+				return EMPTY_TREE_SET;
+			}
+
+			final NavigableSet<PolicyVersion> versions;
+			/*
+			 * We could cache this, but this is meant to be used as a DAO in a
+			 * REST API, i.e. the API should be stateless as much as possible.
+			 * Therefore, we should avoid caching when performance is not
+			 * critical (the performance-critical part is getPDP() only). Also
+			 * this should be in sync as much as possible with the filesystem.
+			 */
+			synchronized (domainDirPath) {
+				final Path policyDir = getPolicyDirectory(policyId);
+				versions = getPolicyVersions(policyDir);
+				// make sure the current PDP state is consistent with the info
+				// returned
+				syncPDP();
+			}
+
+			return versions;
+		}
+
+		@Override
+		public POLICY_DAO_CLIENT getPolicyDAOClient(String policyId) {
+			if (policyId == null) {
+				return null;
+			}
+
+			return policyDAOClientFactory.getInstance(policyId, this);
+		}
+
+		@Override
+		public NavigableSet<PolicyVersion> removePolicy(String policyId) throws IOException, IllegalArgumentException {
+			if (policyId == null) {
+				return EMPTY_TREE_SET;
+			}
+
+			final PolicyVersion requiredPolicyVersion;
+			final NavigableSet<PolicyVersion> versions;
+			synchronized (domainDirPath) {
+				syncPDP();
+				requiredPolicyVersion = pdp.getStaticRootAndRefPolicies().get(policyId);
+				if (requiredPolicyVersion != null) {
+					throw new IllegalArgumentException("Policy '" + policyId
+							+ "' cannot be removed because this policy (version " + requiredPolicyVersion
+							+ ") is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
+				}
+
+				final Path policyDir = getPolicyDirectory(policyId);
+				versions = getPolicyVersions(policyDir);
+				try {
+					// if directory does not exist, this method just returns
+					// right away
+					FileBasedDAOUtils.deleteDirectory(policyDir, 0);
+				} catch (IOException e) {
+					throw new IOException("Error removing policy directory: " + policyDir);
+				}
+			}
+
+			return versions;
+		}
+
+		@Override
+		public Set<String> getPolicyIDs() throws IOException {
+			/*
+			 * We could cache this, but this is meant to be used as a DAO in a
+			 * REST API, i.e. the API should be as stateless as possible.
+			 * Therefore, we should avoid caching when performance is not
+			 * critical (the performance-critical part is getPDP() only). Also
+			 * this should be in sync as much as possible with the filesystem.
+			 */
+			final Set<String> policyIds = new HashSet<>();
+			synchronized (domainDirPath) {
+				try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath,
+						DIRECTORY_FILTER)) {
+					for (final Path policyDirPath : policyParentDirStream) {
+						final String policyDirName = policyDirPath.getFileName().toString();
+						final String policyId;
+						try {
+							policyId = FileBasedDAOUtils.base64UrlDecode(policyDirName);
+						} catch (IllegalArgumentException e) {
+							throw new RuntimeException(
+									"Invalid policy directory name (bad encoding): " + policyDirName);
+						}
+
+						policyIds.add(policyId);
+					}
+				} catch (IOException e) {
+					throw new IOException("Error listing files in policies directory '" + policyParentDirPath
+							+ "' of domain '" + domainId + "'", e);
+				}
+				
+				// make sure PDP is consistent/in sync with the info returned
+				syncPDP();
+			}
+
+			return policyIds;
+		}
+
+		@Override
+		public ReadableDomainProperties removeDomain() throws IOException {
+			final ReadableDomainProperties domainProps;
+			synchronized (domainDirPath) {
+				domainProps = getDomainProperties();
+				FileBasedDAOUtils.deleteDirectory(domainDirPath, 2);
+				if (pdp != null) {
+					pdp.close();
+				}
+
+				removeDomainFromMapsOnly(domainProps.getInternalId());
+			}
+
+			return domainProps;
 		}
 
 		/*
@@ -1509,7 +1671,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	{
 		synchronized(domainsRootDir) {
 			for(final DOMAIN_DAO_CLIENT domain: domainMap.values()) {
-				domain.getDAO().shu
+				domain.getDAO().shutdown();
 			}
 		}
 	}
@@ -1625,7 +1787,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			}
 
 			// domain directory no longer exists, remove from map and so on
-			removeDomainFromMapsOnly(domainId, externalId);
+			removeDomainFromMapsOnly(domainId);
 			return Collections.<String> emptySet();
 		}
 	}
