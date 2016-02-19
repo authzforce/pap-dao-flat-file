@@ -16,7 +16,6 @@ package org.ow2.authzforce.pap.dao.file;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
-import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
 import java.beans.ConstructorProperties;
 import java.io.File;
@@ -25,18 +24,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent;
-import java.nio.file.WatchEvent.Kind;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -117,46 +111,6 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 	private static final Logger LOGGER = LoggerFactory
 			.getLogger(FileBasedDomainsDAO.class);
-
-	private static class SyncedFile
-	{
-		private final Path filePath;
-		private long lastModifiedTimeAtLastSync;
-
-		private SyncedFile(Path filePath) throws IOException
-		{
-			this.filePath = filePath;
-			this.lastModifiedTimeAtLastSync = Files.getLastModifiedTime(
-					filePath, LinkOption.NOFOLLOW_LINKS).toMillis();
-		}
-
-		/**
-		 * Check for any change on the file since call to constructor or last
-		 * call to this method, i.e. current lastModifiedTime greater than last
-		 * registered during these calls. If there was any, the internal status
-		 * is updated with the new/current lastModifiedTime value.
-		 * 
-		 * @return true iff file was changed since
-		 * @throws IOException
-		 *             I/O error retrieving lastModifiedTime of the file
-		 */
-		private boolean sync() throws IOException
-		{
-			final long newLastModifiedTime = Files.getLastModifiedTime(
-					filePath, LinkOption.NOFOLLOW_LINKS).toMillis();
-			if (newLastModifiedTime > lastModifiedTimeAtLastSync)
-			{
-				LOGGER.debug(
-						"Syncing file '{}': changed (new lastModifiedTime since epoch = {}) since last sync (previous lastModifiedTime since epoch = {})",
-						filePath, newLastModifiedTime,
-						lastModifiedTimeAtLastSync);
-				lastModifiedTimeAtLastSync = newLastModifiedTime;
-				return true;
-			}
-
-			return false;
-		}
-	}
 
 	private static class ReadableDomainPropertiesImpl implements
 			ReadableDomainProperties
@@ -371,10 +325,6 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 	/**
 	 * Maps domainId to domain
-	 * 
-	 * FIXME: add externalId as value to allow finding externalId quickly and
-	 * remove from domainIDsByExternalId, when the domain directory has been
-	 * removed (so no way to recover externalId from repository)
 	 */
 	private final ConcurrentMap<String, DOMAIN_DAO_CLIENT> domainMap = new ConcurrentHashMap<>();
 
@@ -387,11 +337,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 	private final PdpModelHandler pdpModelHandler;
 
-	private final ScheduledExecutorService domainsFolderSyncTaskScheduler;
-
-	private final int domainsFolderSyncIntervalSec;
-
-	private final WatchService domainsFolderWatcher;
+	private final long domainDirToMemSyncIntervalSec;
 
 	private final DomainDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT, FileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, DOMAIN_DAO_CLIENT> domainDAOClientFactory;
 	private final PolicyDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> policyDAOClientFactory;
@@ -428,35 +374,80 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		}
 	}
 
-	/**
-	 * Call this method in a block synchronized on 'domainsRootDir'
-	 * 
-	 * @param domainId
-	 *            ID of domain to be removed
-	 */
-	private void removeDomainWithUnknownExternalIdFromMapsOnly(String domainId)
-	{
-		final Iterator<Entry<String, String>> domainEntryIterator = domainIDsByExternalId
-				.entrySet().iterator();
-		while (domainEntryIterator.hasNext())
-		{
-			final Entry<String, String> domainEntry = domainEntryIterator
-					.next();
-			if (domainId.equals(domainEntry.getValue()))
-			{
-				domainEntryIterator.remove();
-			}
-		}
-
-		domainMap.remove(domainId);
-	}
-
 	private final class FileBasedDomainDAOImpl implements
 			FileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>
 	{
 		private final String domainId;
 
 		private final Path domainDirPath;
+
+		private final class DirectoryToMemorySyncTask implements Runnable
+		{
+			@Override
+			public void run()
+			{
+				// this is run by
+				try
+				{
+					LOGGER.debug("Executing synchronization task...");
+					final long lastModifiedTime = Files.getLastModifiedTime(
+							file, LinkOption.NOFOLLOW_LINKS).toMillis();
+					return lastModifiedTime > timeRef ? true : false;
+					/*
+					 * synchonized block makes sure no other thread is messing
+					 * with the domains directory while we synchronize it to
+					 * domainMap. See also method #add(Properties)
+					 */
+					synchronized (domainsRootDir)
+					{
+						if (eventKind == ENTRY_CREATE
+								|| eventKind == ENTRY_MODIFY)
+						{
+							final DOMAIN_DAO_CLIENT secDomain = domainMap
+									.get(domainId);
+							// Force creation if domain does not exist, else
+							// reload
+							if (secDomain == null)
+							{
+								// force creation
+								LOGGER.info(
+										"Sync event '{}' on domain '{}: domain not found in memory -> loading new domain from folder '{}'",
+										new Object[] { eventKind, domainId,
+												domainDirPath });
+								addDomainToMapsAfterDirectoryCreated(domainId,
+										domainDirPath, null);
+							} else
+							{
+								LOGGER.info(
+										"Sync event '{}' on domain '{}: domain found in memory -> reloading from folder '{}'",
+										new Object[] { eventKind, domainId,
+												domainDirPath });
+								secDomain.getDAO().reload();
+							}
+						} else if (eventKind == ENTRY_DELETE)
+						{
+							// it's only removing from the map so no need to
+							// sync on
+							// the filesystem directory
+							LOGGER.info(
+									"Sync event '{}' on domain '{}: deleting if exists in memory",
+									new Object[] { eventKind, domainId,
+											domainDirPath });
+							removeDomainWithUnknownExternalIdFromMapsOnly(domainId);
+						}
+					}
+
+					LOGGER.debug("Synchronization done.");
+
+				} catch (Throwable e)
+				{
+					LOGGER.error(
+							"Domain '{}': error occurred during synchronization task",
+							domainId, e);
+				}
+			}
+
+		}
 
 		private final File propFile;
 
@@ -467,10 +458,26 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 
 		private final DefaultEnvironmentProperties pdpConfEnvProps;
 
-		private volatile PDPImpl pdp;
-		private volatile long lastPdpLoadTime;
-
 		private final DirectoryStream.Filter<Path> policyFilePathFilter;
+
+		private final ScheduledExecutorService dirToMemSyncScheduler;
+
+		/*
+		 * Last time when external ID in domain maps was synced with repository
+		 * (properties file in domain directory (set respectively by
+		 * saveProperties() and loadProperties() methods only)
+		 */
+		private volatile long lastExternalIdSyncedTime = 0;
+
+		private volatile String externalId = null;
+
+		private volatile PDPImpl pdp = null;
+
+		/*
+		 * Last time when PDP was (re)loaded from repository (pdp conf and
+		 * policy files in domain directory) (set only by reloadPDP)
+		 */
+		private volatile long lastPdpSyncedTime = 0;
 
 		/**
 		 * Constructs end-user policy admin domain
@@ -556,19 +563,49 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			// propFile
 			this.propFile = domainDirPath.resolve(DOMAIN_PROPERTIES_FILENAME)
 					.toFile();
-			if (props != null)
+
+			if (props == null)
+			{
+				/*
+				 * Validate and reload domain properties file, load in
+				 * particular the externalId in the externalId-to-domainId map
+				 */
+				getDomainProperties();
+			} else
 			{
 				// set/save properties and update PDP
-				setDomainProperties(props.getDescription(),
-						props.getExternalId());
+				setDomainProperties(props);
 			}
 
-			// just load the PDP from the files
+			// Just load the PDP from the files
 			reloadPDP();
+
+			/*
+			 * Schedule periodic domain directory-to-memory synchronization task
+			 * if sync enabled (strictly positive interval defined)
+			 */
+			if (domainDirToMemSyncIntervalSec > 0)
+			{
+				// Sync enabled
+				final DirectoryToMemorySyncTask syncTask = new DirectoryToMemorySyncTask();
+				dirToMemSyncScheduler = Executors.newScheduledThreadPool(1);
+				dirToMemSyncScheduler.scheduleWithFixedDelay(syncTask,
+						domainDirToMemSyncIntervalSec,
+						domainDirToMemSyncIntervalSec, TimeUnit.SECONDS);
+				LOGGER.info(
+						"Domain {}: scheduled periodic directory-to-memory synchronization (initial delay={}s, period={}s)",
+						domainDirToMemSyncIntervalSec,
+						domainDirToMemSyncIntervalSec);
+			} else
+			{
+				dirToMemSyncScheduler = null;
+			}
 		}
 
 		private void reloadPDP() throws IOException, IllegalArgumentException
 		{
+			// FIXME: set lastPdpSyncedTime
+
 			// test if PDP conf valid, and update the domain's PDP only if valid
 			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfFile,
 					pdpModelHandler);
@@ -597,6 +634,9 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		{
 			synchronized (domainDirPath)
 			{
+				lastExternalIdSyncedTime = System.currentTimeMillis();
+				final DomainProperties props = loadProperties();
+				updateExternalIdCache(props.getExternalId());
 				reloadPDP();
 			}
 		}
@@ -614,6 +654,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		private void updatePDP(Pdp pdpConfTmpl)
 				throws IllegalArgumentException, IOException
 		{
+			// FIXME: make sure lastPdpLoadtime is set before reading
+			// pdpConfTmpl arg passed to this
 			// test if PDP conf valid, and update the domain's PDP only if valid
 			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfTmpl,
 					pdpConfEnvProps);
@@ -640,7 +682,7 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			pdp = newPDP;
 		}
 
-		private void saveProperties(String description, String externalId)
+		private void saveProperties(WritableDomainProperties props)
 				throws IOException
 		{
 			final Marshaller marshaller;
@@ -667,9 +709,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				 * 
 				 * @XmlRootElement
 				 */
-				marshaller
-						.marshal(new DomainProperties(description, externalId),
-								propFile);
+				marshaller.marshal(new DomainProperties(props.getDescription(),
+						props.getExternalId()), propFile);
 			} catch (JAXBException e)
 			{
 				throw new IOException(
@@ -736,48 +777,6 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 		/**
 		 * Call this method in a synchronized block always
 		 */
-		private ReadableDomainProperties setDomainProperties(
-				String description, String externalId) throws IOException,
-				IllegalArgumentException
-		{
-			// Update non-PDP properties
-			// Get old externalId first for updating externalId later
-			final DomainProperties oldProps = loadProperties();
-			final String oldExternalId = oldProps.getExternalId();
-			saveProperties(description, externalId);
-
-			if (externalId != null && !externalId.equals(oldExternalId))
-			{
-				if (oldExternalId != null)
-				{
-					// verify oldExternalId valid for domainId
-					final String matchingDomainId = domainIDsByExternalId
-							.get(oldExternalId);
-					if (!domainId.equals(matchingDomainId))
-					{
-						// wrong oldExternalId - this is critical and should not
-						// happen, unless the properties file was changed
-						// manually
-						throw new RuntimeException(
-								"Failed to update externalId of domain '"
-										+ domainId
-										+ "': wrong oldExternalId arg = "
-										+ oldExternalId);
-					}
-
-					domainIDsByExternalId.remove(oldExternalId);
-				}
-
-				domainIDsByExternalId.put(externalId, domainId);
-			}
-
-			return new ReadableDomainPropertiesImpl(domainId, description,
-					externalId);
-		}
-
-		/**
-		 * Call this method in a synchronized block always
-		 */
 		private ReadablePdpProperties setPdpRootPolicy(
 				IdReferenceType rootPolicyRef, Pdp pdpConf) throws IOException,
 				IllegalArgumentException
@@ -834,21 +833,63 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 					lastPdpLoadTime, matchedPolicyRefs);
 		}
 
+		/**
+		 * Update externalId (cached value) and external-id-to-domain map
+		 * 
+		 * @param newExternalId
+		 */
+		private void updateExternalIdCache(String newExternalId)
+		{
+			if (externalId == null)
+			{
+				// externalId not previously set
+				if (newExternalId != null)
+				{
+					domainIDsByExternalId.put(newExternalId, domainId);
+
+				}
+			} else if (!externalId.equals(newExternalId))
+			{
+				// externalId was set and has changed or unset
+				domainIDsByExternalId.remove(externalId);
+				if (newExternalId != null)
+				{
+					domainIDsByExternalId.put(newExternalId, domainId);
+				}
+			}
+
+			externalId = newExternalId;
+		}
+
 		@Override
 		public ReadableDomainProperties getDomainProperties()
 				throws IOException
 		{
-			final DomainProperties props = loadProperties();
+
+			final DomainProperties props;
+			synchronized (domainDirPath)
+			{
+				final long lastModified = propFile.lastModified();
+				final boolean isFileModified = lastModified > lastExternalIdSyncedTime;
+				// let's sync
+				lastExternalIdSyncedTime = System.currentTimeMillis();
+				props = loadProperties();
+				if (isFileModified)
+				{
+					updateExternalIdCache(props.getExternalId());
+				}
+			}
+
 			return new ReadableDomainPropertiesImpl(domainId,
 					props.getDescription(), props.getExternalId());
 		}
 
 		@Override
 		public ReadableDomainProperties setDomainProperties(
-				WritableDomainProperties domainProperties) throws IOException,
+				WritableDomainProperties props) throws IOException,
 				IllegalArgumentException
 		{
-			if (domainProperties == null)
+			if (props == null)
 			{
 				throw NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION;
 			}
@@ -857,9 +898,17 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			// multiple threads, keep minimal things in the synchronized block
 			synchronized (domainDirPath)
 			{
-				return setDomainProperties(domainProperties.getDescription(),
-						domainProperties.getExternalId());
+				// let's sync to directory
+				lastExternalIdSyncedTime = System.currentTimeMillis();
+				// validate and save new properties to disk
+				saveProperties(props);
+				// update externalId (cached value) and external-id-to-domain
+				// map
+				updateExternalIdCache(props.getExternalId());
 			}
+
+			return new ReadableDomainPropertiesImpl(domainId,
+					props.getDescription(), props.getExternalId());
 
 		}
 
@@ -1573,6 +1622,43 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 			return policy;
 		}
 
+		/*
+		 * Code adapted from ExecutorService javadoc
+		 */
+		public void shutdownSyncAndAwaitTermination(ExecutorService pool)
+		{
+			pool.shutdown(); // Disable new tasks from being submitted
+			try
+			{
+				// Wait a while for existing tasks to terminate
+				if (!pool.awaitTermination(domainToDirectorySyncIntervalSec,
+						TimeUnit.SECONDS))
+				{
+					LOGGER.error(
+							"Scheduler wait timeout ({}s) occurred before task could terminate after shutdown request.",
+							domainToDirectorySyncIntervalSec);
+					pool.shutdownNow(); // Cancel currently executing tasks
+					// Wait a while for tasks to respond to being cancelled
+					if (!pool.awaitTermination(
+							domainToDirectorySyncIntervalSec, TimeUnit.SECONDS))
+					{
+						LOGGER.error(
+								"Scheduler wait timeout ({}s) occurred before task could terminate after shudownNow request.",
+								domainToDirectorySyncIntervalSec);
+					}
+				}
+			} catch (InterruptedException ie)
+			{
+				LOGGER.error(
+						"Scheduler interrupted while waiting for sync task to complete",
+						ie);
+				// (Re-)Cancel if current thread also interrupted
+				pool.shutdownNow();
+				// Preserve interrupt status
+				Thread.currentThread().interrupt();
+			}
+		}
+
 	}
 
 	/**
@@ -1613,235 +1699,6 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	private static <T> WatchEvent<T> cast(WatchEvent<?> event)
 	{
 		return (WatchEvent<T>) event;
-	}
-
-	private final class DomainsFolderSyncTask implements Runnable
-	{
-		private final Map<Path, WatchEvent.Kind<?>> domainFolderToEventMap = new HashMap<>();
-		private final Map<WatchKey, Path> domainsFolderWatchKeys = new HashMap<>();
-
-		/**
-		 * Register the given directory with the WatchService
-		 */
-		private void addWatchedDirectory(Path dir)
-		{
-			final WatchKey key;
-			try
-			{
-				key = dir.register(domainsFolderWatcher, ENTRY_CREATE,
-						ENTRY_DELETE, ENTRY_MODIFY);
-			} catch (IOException ex)
-			{
-				throw new RuntimeException("Failed to register directory '"
-						+ dir + "' with WatchService for synchronization", ex);
-			}
-
-			if (LOGGER.isDebugEnabled())
-			{
-				final Path prev = this.domainsFolderWatchKeys.get(key);
-				if (prev == null)
-				{
-					LOGGER.debug("register watch key: {}", dir);
-				} else
-				{
-					if (!dir.equals(prev))
-					{
-						LOGGER.debug("update watch key: {} -> {}", prev, dir);
-					}
-				}
-			}
-
-			this.domainsFolderWatchKeys.put(key, dir);
-		}
-
-		@Override
-		public void run()
-		{
-			try
-			{
-				LOGGER.debug("Executing synchronization task...");
-				WatchKey key;
-				// try {
-				// key = watcher.take();
-				// if(key == null) {
-				// continue;
-				// }
-				// } catch (InterruptedException x) {
-				// // throw new RuntimeException(x);
-				// return;
-				// }
-				// poll all pending watch keys
-				while ((key = domainsFolderWatcher.poll()) != null)
-				{
-
-					final Path dir = domainsFolderWatchKeys.get(key);
-					if (dir == null)
-					{
-						LOGGER.error("Watch key does not match any registered directory");
-						continue;
-					}
-
-					LOGGER.debug("Processing watch key for path: {}", dir);
-
-					for (final WatchEvent<?> event : key.pollEvents())
-					{
-						final WatchEvent.Kind<?> kind = event.kind();
-						// To retrieve the path attached to the Key:
-						// Path dir = (Path) key.watchable();
-
-						if (kind == OVERFLOW)
-						{
-							LOGGER.error("Some watch event might have been lost or discarded. Consider restarting the application to force reset synchronization state and reduce the sync interval.");
-							continue;
-						}
-
-						// Context for directory entry event is the file name of
-						// entry
-						final WatchEvent<Path> ev = cast(event);
-						final Path childRelativePath = ev.context();
-						final Path childAbsPath = dir
-								.resolve(childRelativePath);
-
-						// print out event
-						LOGGER.info("Domains folder change detected: {}: {}",
-								event.kind().name(), childRelativePath);
-
-						// if directory is created, and watching recursively,
-						// then
-						// register it and its sub-directories
-						if (/* recursive && */kind == ENTRY_CREATE
-								&& Files.isDirectory(childAbsPath,
-										LinkOption.NOFOLLOW_LINKS))
-						{
-							// registerAll(child);
-							addWatchedDirectory(childAbsPath);
-							// FIXME: if domain directory, add directories
-							// recursively, 'policies', 'policies/*', etc. (see
-							// WatchDir.java example from
-							// Oracle)
-
-						}
-
-						// MONITORING DOMAIN FOLDERS
-						if (dir.equals(domainsRootDir))
-						{
-							// child of root folder (domains) created or deleted
-							// (ignore modify at
-							// this
-							// level)
-							// && evaluated before ||
-							if (kind == ENTRY_CREATE
-									&& Files.isDirectory(childAbsPath,
-											LinkOption.NOFOLLOW_LINKS)
-									|| kind == ENTRY_DELETE)
-							{
-								domainFolderToEventMap.put(childAbsPath, kind);
-							}
-						} else
-						{
-							/*
-							 * modify on subfolder (domain) If no CREATE event
-							 * already registered in map, register MODIFY
-							 */
-							final WatchEvent.Kind<?> eventKind = domainFolderToEventMap
-									.get(dir);
-							if (eventKind != ENTRY_CREATE)
-							{
-								domainFolderToEventMap.put(dir, ENTRY_MODIFY);
-							}
-						}
-					}
-
-					// reset key and remove from set if directory no longer
-					// accessible
-					final boolean valid = key.reset();
-					if (!valid)
-					{
-						domainsFolderWatchKeys.remove(key);
-
-						// all directories are inaccessible
-						if (domainsFolderWatchKeys.isEmpty())
-						{
-							break;
-						}
-					}
-				}
-
-				// do the actions according to map
-				LOGGER.debug("Synchronization events to be handled: {}",
-						domainFolderToEventMap);
-				for (final Entry<Path, Kind<?>> domainFolderToEventEntry : domainFolderToEventMap
-						.entrySet())
-				{
-					final Path domainDirPath = domainFolderToEventEntry
-							.getKey();
-					final Kind<?> eventKind = domainFolderToEventEntry
-							.getValue();
-					// domain folder name is assumed to be a domain ID
-					final Path lastPathSegment = domainDirPath.getFileName();
-					if (lastPathSegment == null)
-					{
-						throw new RuntimeException("Invalid Domain folder '"
-								+ domainDirPath + "': no filename");
-					}
-
-					final String domainId = lastPathSegment.toString();
-					/*
-					 * synchonized block makes sure no other thread is messing
-					 * with the domains directory while we synchronize it to
-					 * domainMap. See also method #add(Properties)
-					 */
-					synchronized (domainsRootDir)
-					{
-						if (eventKind == ENTRY_CREATE
-								|| eventKind == ENTRY_MODIFY)
-						{
-							final DOMAIN_DAO_CLIENT secDomain = domainMap
-									.get(domainId);
-							// Force creation if domain does not exist, else
-							// reload
-							if (secDomain == null)
-							{
-								// force creation
-								LOGGER.info(
-										"Sync event '{}' on domain '{}: domain not found in memory -> loading new domain from folder '{}'",
-										new Object[] { eventKind, domainId,
-												domainDirPath });
-								addDomainToMapsAfterDirectoryCreated(domainId,
-										domainDirPath, null);
-							} else
-							{
-								LOGGER.info(
-										"Sync event '{}' on domain '{}: domain found in memory -> reloading from folder '{}'",
-										new Object[] { eventKind, domainId,
-												domainDirPath });
-								secDomain.getDAO().reload();
-							}
-						} else if (eventKind == ENTRY_DELETE)
-						{
-							// it's only removing from the map so no need to
-							// sync on
-							// the filesystem directory
-							LOGGER.info(
-									"Sync event '{}' on domain '{}: deleting if exists in memory",
-									new Object[] { eventKind, domainId,
-											domainDirPath });
-							removeDomainWithUnknownExternalIdFromMapsOnly(domainId);
-						}
-					}
-				}
-
-				LOGGER.debug("Synchronization done.");
-
-				domainFolderToEventMap.clear();
-			} catch (Throwable e)
-			{
-				LOGGER.error(
-						"Error occurred during domains folder synchronization task",
-						e);
-			}
-		}
-
 	}
 
 	/**
@@ -1984,39 +1841,6 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				"File defined by SecurityDomainManager parameter 'domainTmpl'",
 				domainTmplDirPath, true, false);
 
-		// Initialize endUserDomains and register their folders to the
-		// WatchService for monitoring
-		// them at the same time
-		final DomainsFolderSyncTask syncTask;
-		if (domainsSyncIntervalSec > 0)
-		{
-			// Sync enabled
-			WatchService fsWatchService = null;
-			try
-			{
-				fsWatchService = FileSystems.getDefault().newWatchService();
-			} catch (IOException e)
-			{
-				throw new IOException(
-						"Failed to create a WatchService for watching directory changes to the domains on the filesystem",
-						e);
-			}
-
-			if (fsWatchService == null)
-			{
-				throw new IOException(
-						"Failed to create a WatchService for watching directory changes to the domains on the filesystem");
-			}
-
-			this.domainsFolderWatcher = fsWatchService;
-			syncTask = new DomainsFolderSyncTask();
-			syncTask.addWatchedDirectory(this.domainsRootDir);
-		} else
-		{
-			this.domainsFolderWatcher = null;
-			syncTask = null;
-		}
-
 		LOGGER.debug("Looking for domain sub-directories in directory {}",
 				domainsRootDir);
 		try (final DirectoryStream<Path> dirStream = Files
@@ -2056,11 +1880,6 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 				final DOMAIN_DAO_CLIENT domain = domainDAOClientFactory
 						.getInstance(domainId, domainDAO);
 				domainMap.put(domainId, domain);
-
-				if (syncTask != null)
-				{
-					syncTask.addWatchedDirectory(domainPath);
-				}
 			}
 		} catch (IOException e)
 		{
@@ -2070,26 +1889,8 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 							+ "' looking for domain directories", e);
 		}
 
-		/*
-		 * No error occurred, we can start new thread for watching/syncing
-		 * domains safely now if sync interval > 0
-		 */
-		if (syncTask != null)
-		{
-			domainsFolderSyncTaskScheduler = Executors
-					.newScheduledThreadPool(1);
-			LOGGER.info(
-					"Scheduling periodic domains folder synchronization (initial delay={}s, period={}s)",
-					domainsSyncIntervalSec, domainsSyncIntervalSec);
-			domainsFolderSyncTaskScheduler.scheduleWithFixedDelay(syncTask,
-					domainsSyncIntervalSec, domainsSyncIntervalSec,
-					TimeUnit.SECONDS);
-		} else
-		{
-			domainsFolderSyncTaskScheduler = null;
-		}
-
-		this.domainsFolderSyncIntervalSec = domainsSyncIntervalSec;
+		this.domainToDirectorySyncIntervalSec = Integer.valueOf(
+				domainsSyncIntervalSec).longValue();
 	}
 
 	/**
@@ -2098,61 +1899,10 @@ public final class FileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionD
 	 */
 	public void stopDomainsSync()
 	{
-		if (domainsFolderSyncTaskScheduler != null)
-		{
-			LOGGER.info(
-					"Requesting shutdown of scheduler of periodic domains folder synchronization. Waiting {}s for pending sync task to complete...",
-					domainsFolderSyncIntervalSec);
-			shutdownAndAwaitTermination(domainsFolderSyncTaskScheduler);
-			try
-			{
-				LOGGER.info(
-						"Closing WatchService used for watching domains folder",
-						domainsFolderSyncIntervalSec);
-				domainsFolderWatcher.close();
-			} catch (IOException e)
-			{
-				LOGGER.error(
-						"Failed to close WatchService. This may cause a memory leak.",
-						e);
+		synchronized(domainsRootDir) {
+			for(final DOMAIN_DAO_CLIENT domain: domainMap.values()) {
+				domain.getDAO().shu
 			}
-		}
-	}
-
-	/*
-	 * Code adapted from ExecutorService javadoc
-	 */
-	private void shutdownAndAwaitTermination(ExecutorService pool)
-	{
-		pool.shutdown(); // Disable new tasks from being submitted
-		try
-		{
-			// Wait a while for existing tasks to terminate
-			if (!pool.awaitTermination(domainsFolderSyncIntervalSec,
-					TimeUnit.SECONDS))
-			{
-				LOGGER.error(
-						"Scheduler wait timeout ({}s) occurred before task could terminate after shutdown request.",
-						domainsFolderSyncIntervalSec);
-				pool.shutdownNow(); // Cancel currently executing tasks
-				// Wait a while for tasks to respond to being cancelled
-				if (!pool.awaitTermination(domainsFolderSyncIntervalSec,
-						TimeUnit.SECONDS))
-				{
-					LOGGER.error(
-							"Scheduler wait timeout ({}s) occurred before task could terminate after shudownNow request.",
-							domainsFolderSyncIntervalSec);
-				}
-			}
-		} catch (InterruptedException ie)
-		{
-			LOGGER.error(
-					"Scheduler interrupted while waiting for sync task to complete",
-					ie);
-			// (Re-)Cancel if current thread also interrupted
-			pool.shutdownNow();
-			// Preserve interrupt status
-			Thread.currentThread().interrupt();
 		}
 	}
 
