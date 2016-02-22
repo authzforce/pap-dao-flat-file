@@ -11,11 +11,11 @@
 	<description>AuthZForce CE - PAP DAO implementation based on flat file database</description>
 	<url>https://tuleap.ow2.org/projects/authzforce</url>
 	<scm>
-		<connection>scm:git:${git.url.base}/pap-dao-file.git</connection>
-		<developerConnection>scm:git:${git.url.base}/pap-dao-file.git</developerConnection>
+		<connection>scm:git:${git.url.base}/pap-dao-flat-file.git</connection>
+		<developerConnection>scm:git:${git.url.base}/pap-dao-flat-file.git</developerConnection>
 		<tag>HEAD</tag>
 		<!-- Publicly browsable repository URL. For example, via Gitlab web UI. -->
-		<url>${git.url.base}/pap-dao-file</url>
+		<url>${git.url.base}/pap-dao-flat-file</url>
 	</scm>
 	<dependencies>
 		<!-- Third-party dependencies -->

@@ -9,7 +9,7 @@
  * 
  * You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.ow2.authzforce.pap.dao.file;
+package org.ow2.authzforce.pap.dao.flatfile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +31,7 @@ import com.google.common.io.BaseEncoding;
 /**
  * Utility methods
  */
-public final class FileBasedDAOUtils
+public final class FlatFileDAOUtils
 {
 	// FIXME: Instead of google BaseEncoding, use
 	// java.util.Base64.getURLEncoder() when moving to Java 8
@@ -66,12 +66,12 @@ public final class FileBasedDAOUtils
 
 	/**
 	 * Decode string encoded with
-	 * {@link FileBasedDAOUtils#base64UrlEncode(String)}
+	 * {@link FlatFileDAOUtils#base64UrlEncode(String)}
 	 * 
 	 * @param encoded
 	 *            input
 	 * @return decoded result, i.e. original string encoded with
-	 *         {@link FileBasedDAOUtils#base64UrlEncode(String)}
+	 *         {@link FlatFileDAOUtils#base64UrlEncode(String)}
 	 * @throws IllegalArgumentException
 	 *             if the input is not a valid encoded string according to
 	 *             base64url encoding without padding
@@ -86,7 +86,7 @@ public final class FileBasedDAOUtils
 	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException(
 			"Null file arg");
 
-	private FileBasedDAOUtils()
+	private FlatFileDAOUtils()
 	{
 	}
 

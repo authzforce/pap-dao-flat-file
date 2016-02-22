@@ -11,7 +11,7 @@
  *
  * You should have received a copy of the GNU General Public License along with AuthZForce CE. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.ow2.authzforce.pap.dao.file;
+package org.ow2.authzforce.pap.dao.flatfile;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -46,8 +46,8 @@ import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluator;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicySetEvaluator;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
-import org.ow2.authzforce.pap.dao.file.FileBasedDAOUtils.SuffixMatchingDirectoryStreamFilter;
 import org.ow2.authzforce.pap.dao.file.xmlns.StaticFileBasedDAORefPolicyProvider;
+import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
 import org.springframework.util.ResourceUtils;
 
 /**
@@ -62,7 +62,7 @@ import org.springframework.util.ResourceUtils;
  * 'base64url' function refers to Base64url encoding specified by RFC 4648,
  * without padding.
  */
-public final class FileBasedDAORefPolicyProviderModule implements
+public final class FlatFileDAORefPolicyProviderModule implements
 		RefPolicyProviderModule
 {
 	private static final IllegalArgumentException NULL_POLICY_LOCATION_PATTERN_ARGUMENT_EXCEPTION = new IllegalArgumentException(
@@ -163,7 +163,7 @@ public final class FileBasedDAORefPolicyProviderModule implements
 			final String policyLocationPattern = environmentProperties
 					.replacePlaceholders(conf.getPolicyLocationPattern());
 			final Entry<Path, String> result = validateConf(policyLocationPattern);
-			return new FileBasedDAORefPolicyProviderModule(result.getKey(),
+			return new FlatFileDAORefPolicyProviderModule(result.getKey(),
 					result.getValue(), xacmlParserFactory, expressionFactory,
 					combiningAlgRegistry, maxPolicySetRefDepth);
 		}
@@ -250,7 +250,7 @@ public final class FileBasedDAORefPolicyProviderModule implements
 							jaxbPolicySet, null,
 							xacmlParser.getNamespacePrefixUriMap(),
 							expressionFactory, combiningAlgRegistry,
-							FileBasedDAORefPolicyProviderModule.this,
+							FlatFileDAORefPolicyProviderModule.this,
 							policySetRefChain);
 				} catch (IllegalArgumentException e)
 				{
@@ -267,7 +267,7 @@ public final class FileBasedDAORefPolicyProviderModule implements
 	private final Map<String, PolicyVersions<PolicyProxy>> policySetMap = new HashMap<>();
 	private final int policyFilenameSuffixLength;
 
-	private FileBasedDAORefPolicyProviderModule(Path policyParentDirectory,
+	private FlatFileDAORefPolicyProviderModule(Path policyParentDirectory,
 			final String suffix, XACMLParserFactory xacmlParserFactory,
 			ExpressionFactory expressionFactory,
 			CombiningAlgRegistry combiningAlgRegistry, int maxPolicySetRefDepth)
@@ -277,7 +277,7 @@ public final class FileBasedDAORefPolicyProviderModule implements
 		assert expressionFactory != null;
 		assert combiningAlgRegistry != null;
 
-		FileBasedDAOUtils.checkFile("RefPolicyProvider's policy directory",
+		FlatFileDAOUtils.checkFile("RefPolicyProvider's policy directory",
 				policyParentDirectory, true, false);
 		this.policyParentDirectory = policyParentDirectory;
 		this.dirStreamFilter = new SuffixMatchingDirectoryStreamFilter(suffix);
@@ -323,7 +323,7 @@ public final class FileBasedDAORefPolicyProviderModule implements
 			// directory is there on the filesystem, but not yet added to the
 			// map
 			// policy directory name is base64url(policyid)
-			final String policyDirname = FileBasedDAOUtils.base64UrlEncode(id);
+			final String policyDirname = FlatFileDAOUtils.base64UrlEncode(id);
 			final Path policyFile = policyParentDirectory
 					.resolve(policyDirname);
 			try (final DirectoryStream<Path> policyDirStream = Files
