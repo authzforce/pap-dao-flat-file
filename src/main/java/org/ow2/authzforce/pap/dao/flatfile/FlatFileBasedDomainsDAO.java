@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -842,6 +843,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			final DomainProperties props = loadProperties();
 			if (isFileModified)
 			{
+				if(LOGGER.isDebugEnabled()) {
+					LOGGER.debug("Domain {}: file '{}' (lastModifiedTime = {}) changed since last sync -> updating externalId in externalId-to-domain map", domainId, propFile, new Date(lastModifiedTime));
+				}
+				
 				updateCachedExternalId(props.getExternalId());
 			}
 
@@ -915,6 +920,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 						policyPath, LinkOption.NOFOLLOW_LINKS).toMillis();
 				if (policyLastModifiedTime > lastPdpSyncedTime)
 				{
+					if(LOGGER.isDebugEnabled()) {
+						LOGGER.debug("Domain {}: policy file '{}' (lastModifiedTime = {}) changed since last sync -> reloading PDP", domainId, policyPath, new Date(policyLastModifiedTime));
+					}
+					
 					reloadPDP();
 					return true;
 				}
@@ -939,6 +948,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			final long pdpConfLastModifiedTime = pdpConfFile.lastModified();
 			if (pdpConfLastModifiedTime > lastPdpSyncedTime)
 			{
+				if(LOGGER.isDebugEnabled()) {
+					LOGGER.debug("Domain {}: PDP conf file '{}' (lastModifiedTime = {}) changed since last sync -> reloading PDP", domainId, pdpConfFile, new Date(pdpConfLastModifiedTime));
+				}
+				
 				reloadPDP();
 				return true;
 			}
@@ -1065,6 +1078,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 				if (isPdpConfModified)
 				{
+					if(LOGGER.isDebugEnabled()) {
+						LOGGER.debug("Domain {}: PDP conf file '{}' (lastModifiedTime = {}) changed since last sync -> reloading PDP", domainId, pdpConfFile, new Date(lastModifiedTime));
+					}
+					
 					reloadPDP(pdpConf);
 				} else
 				{
@@ -1160,6 +1177,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				pdpConf = loadPDPConfTmpl();
 				if (isFileModified)
 				{
+					if(LOGGER.isDebugEnabled()) {
+						LOGGER.debug("Domain {}: PDP conf file '{}' (lastModifiedTime = {}) changed since last sync -> reloading PDP", domainId, pdpConfFile, new Date(lastModifiedTime));
+					}
+					
 					reloadPDP(pdpConf);
 				}
 			}
