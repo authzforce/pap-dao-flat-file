@@ -15,7 +15,7 @@ All notable changes to this project are documented in this file following the [K
   - If the domain's directory found missing by the synchronizing thread, the thread deletes the domain from cache.
   - If any change to properties.xml (domain description, externalId) detected, externalId updated in cache
   - If any change to pdp.xml or the file of any policy used by the PDP, the PDP is reloaded.
-- Version of implemented PAP API (dependency 'core-pap-api'), i.e. 4.0.0, in particular:
+- Version of implemented PAP API (dependency 'core-pap-api'): 4.0.0; in particular:
     - PolicyVersion type used for policy versions (instead of String)
     - Implemented getLatestPolicyVersion(policyId) to get latest version of a given policy
 
