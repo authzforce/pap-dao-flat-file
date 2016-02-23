@@ -8,10 +8,11 @@ All notable changes to this project are documented in this file following the [K
 - Manual synchronization of domains:
   - FlatFileBasedDomainsDAO#getDomainIDs() forces re-synchronization of all domains
   - FlatFileBasedDomainDAO#get*() methods force re-synchronization of the domain to make sure the returned data is up-to-date
+  - FlatFileBasedDomainDAO#removeDomain() removes the domain from cache even if the domain directory is already deleted on disk
 
 ### Changed
 - Strategy for synchronizing cached domain's PDP and externalId-to-domain mapping with configuration files: no longer using Java WatchService, but each domain has a specific thread polling files in the domain directory's and checking their lastModifiedTime attribute for change:
-  - If a given domain ID is requested and no maching domain in cache, but a matching domain directory is found, the domain is automatically synced to cache and the synchronizing thread created;
+  - If a given domain ID is requested and no matching domain in cache, but a matching domain directory is found, the domain is automatically synced to cache and the synchronizing thread created;
   - If the domain's directory found missing by the synchronizing thread, the thread deletes the domain from cache.
   - If any change to properties.xml (domain description, externalId) detected, externalId updated in cache
   - If any change to pdp.xml or the file of any policy used by the PDP, the PDP is reloaded.
