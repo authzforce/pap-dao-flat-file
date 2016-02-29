@@ -220,14 +220,6 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	 */
 	public static final String DOMAIN_PDP_CONFIG_FILENAME = "pdp.xml";
 
-	/**
-	 * Must start with a non-base64url character
-	 */
-	public static final String FILE_BACKUP_SUFFIX = ".old";
-
-	// private static final Logger LOGGER =
-	// LoggerFactory.getLogger(SecurityDomain.class);
-
 	private static final JAXBContext DOMAIN_PROPERTIES_JAXB_CONTEXT;
 
 	static
@@ -1780,13 +1772,12 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	 *            max number of versions per policy, unlimited if negative.
 	 * @param removeOldestVersionsIfMaxExceeded
 	 *            true iff oldest unused policies versions must be automatically removed to make sure that
-	 *            {@code maxNumOfVersionsPerPolicy} is not exceeded
+	 *            {@code maxNumOfVersionsPerPolicy} is not exceeded; otherwise an exception is thrown when trying to add
+	 *            a new version after {@code maxNumOfVersionsPerPolicy} has been reached
 	 * @param domainDAOClientFactory
 	 *            domain DAO client factory
 	 * @throws IOException
-	 *             I/O error occurred scanning existing domain folders in {@code domainsRoot} for loading; or if
-	 *             {@code domainsSyncIntervalSec > 0} and a WatchService for watching directory changes to the domains
-	 *             on the filesystem could not be created
+	 *             I/O error occurred scanning existing domain folders in {@code domainsRoot} for loading.
 	 */
 	@ConstructorProperties({ "domainsRoot", "domainTmpl", "domainsSyncIntervalSec", "pdpModelHandler",
 			"useRandomAddressBasedUUID", "maxNumOfPoliciesPerDomain", "maxNumOfVersionsPerPolicy",
