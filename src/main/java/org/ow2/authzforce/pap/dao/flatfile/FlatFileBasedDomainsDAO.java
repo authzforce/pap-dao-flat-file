@@ -387,6 +387,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					{
 						removeDomainFromCache(domainId);
 					}
+
 					return null;
 				}
 
@@ -479,7 +480,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		{
 			assert domainDirPath != null;
 
-			this.domainId = domainDirPath.getFileName().toString();
+			final Path domainFileName = domainDirPath.getFileName();
+			if (domainFileName == null)
+			{
+				throw new IllegalArgumentException("Invalid domain directory path: " + domainDirPath);
+			}
+
+			this.domainId = domainFileName.toString();
 
 			// domainDir
 			FlatFileDAOUtils.checkFile("Domain directory", domainDirPath, true, true);
@@ -1465,7 +1472,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				{
 					for (final Path policyVersionFilePath : policyDirStream)
 					{
-						final String versionPlusSuffix = policyVersionFilePath.getFileName().toString();
+						final Path policyVersionFileName = policyVersionFilePath.getFileName();
+						if (policyVersionFileName == null)
+						{
+							throw new IOException("Invalid policy file path: " + policyVersionFilePath);
+						}
+
+						final String versionPlusSuffix = policyVersionFileName.toString();
 						final String versionId = versionPlusSuffix.substring(0, versionPlusSuffix.length()
 								- policyFilenameSuffix.length());
 						final PolicyVersion version = new PolicyVersion(versionId);
@@ -1509,7 +1522,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			{
 				for (final Path policyVersionFilePath : policyDirStream)
 				{
-					final String versionPlusSuffix = policyVersionFilePath.getFileName().toString();
+					final Path policyVersionFileName = policyVersionFilePath.getFileName();
+					if (policyVersionFileName == null)
+					{
+						throw new IOException("Invalid policy file path: " + policyVersionFilePath);
+					}
+
+					final String versionPlusSuffix = policyVersionFileName.toString();
 					final String versionId = versionPlusSuffix.substring(0, versionPlusSuffix.length()
 							- policyFilenameSuffix.length());
 					final PolicyVersion version = new PolicyVersion(versionId);
@@ -1619,11 +1638,17 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				{
 					for (final Path policyDirPath : policyParentDirStream)
 					{
-						final String policyDirName = policyDirPath.getFileName().toString();
+						final Path policyDirName = policyDirPath.getFileName();
+						if (policyDirName == null)
+						{
+							throw new IOException("Invalid policy (versions) directory path: " + policyDirPath);
+						}
+
+						final String encodedPolicyId = policyDirName.toString();
 						final String policyId;
 						try
 						{
-							policyId = FlatFileDAOUtils.base64UrlDecode(policyDirName);
+							policyId = FlatFileDAOUtils.base64UrlDecode(encodedPolicyId);
 						} catch (IllegalArgumentException e)
 						{
 							throw new RuntimeException("Invalid policy directory name (bad encoding): " + policyDirName);
@@ -1872,7 +1897,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				final Path lastPathSegment = domainPath.getFileName();
 				if (lastPathSegment == null)
 				{
-					throw new RuntimeException("Invalid Domain folder '" + domainPath + "': no filename");
+					throw new RuntimeException("Invalid Domain folder path '" + domainPath + "': no filename");
 				}
 
 				final String domainId = lastPathSegment.toString();
@@ -2037,7 +2062,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					final Path lastPathSegment = domainDirPath.getFileName();
 					if (lastPathSegment == null)
 					{
-						throw new RuntimeException("Invalid Domain folder '" + domainDirPath + "': no filename");
+						throw new RuntimeException("Invalid Domain folder path '" + domainDirPath + "': no filename");
 					}
 
 					final String domainId = lastPathSegment.toString();
