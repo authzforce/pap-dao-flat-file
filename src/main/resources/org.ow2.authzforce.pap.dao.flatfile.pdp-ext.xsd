@@ -37,7 +37,7 @@
 			</p>
 		</xs:documentation>
 	</xs:annotation>
-	<xs:complexType name="StaticFileBasedDAORefPolicyProvider">
+	<xs:complexType name="StaticFlatFileDAORefPolicyProvider">
 		<xs:annotation>
 			<xs:documentation>
 				Static Ref Policy Provider for the flat-file-based PAP DAO. This provider expects to find a XACML PolicySet file at ROOT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX.

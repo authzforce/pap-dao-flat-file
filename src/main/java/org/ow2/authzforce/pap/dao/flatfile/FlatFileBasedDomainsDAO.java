@@ -74,8 +74,8 @@ import org.ow2.authzforce.core.pdp.impl.PdpConfigurationParser;
 import org.ow2.authzforce.core.pdp.impl.PdpModelHandler;
 import org.ow2.authzforce.core.xmlns.pdp.Pdp;
 import org.ow2.authzforce.core.xmlns.pdp.StaticRefBasedRootPolicyProvider;
-import org.ow2.authzforce.pap.dao.file.xmlns.DomainProperties;
-import org.ow2.authzforce.pap.dao.file.xmlns.StaticFileBasedDAORefPolicyProvider;
+import org.ow2.authzforce.pap.dao.flatfile.xmlns.DomainProperties;
+import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDAORefPolicyProvider;
 import org.ow2.authzforce.xmlns.pdp.ext.AbstractAttributeProvider;
 import org.ow2.authzforce.xmlns.pdp.ext.AbstractPolicyProvider;
 import org.slf4j.Logger;
@@ -208,7 +208,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	/**
 	 * Domain properties XSD location
 	 */
-	public static final String DOMAIN_PROPERTIES_XSD_LOCATION = "classpath:org.ow2.authzforce.pap.dao.file.properties.xsd";
+	public static final String DOMAIN_PROPERTIES_XSD_LOCATION = "classpath:org.ow2.authzforce.pap.dao.flatfile.properties.xsd";
 
 	/**
 	 * Name of domain properties file
@@ -507,15 +507,15 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			// Get the refpolicies parent directory and suffix from PDP conf
 			// (refPolicyProvider)
 			final AbstractPolicyProvider refPolicyProvider = pdpConf.getRefPolicyProvider();
-			if (!(refPolicyProvider instanceof StaticFileBasedDAORefPolicyProvider))
+			if (!(refPolicyProvider instanceof StaticFlatFileDAORefPolicyProvider))
 			{
 				// critical error
 				throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "' in file '"
 						+ pdpConfFile + "': refPolicyProvider is not an instance of "
-						+ StaticFileBasedDAORefPolicyProvider.class + " as expected.");
+						+ StaticFlatFileDAORefPolicyProvider.class + " as expected.");
 			}
 
-			final StaticFileBasedDAORefPolicyProvider fileBasedRefPolicyProvider = (StaticFileBasedDAORefPolicyProvider) refPolicyProvider;
+			final StaticFlatFileDAORefPolicyProvider fileBasedRefPolicyProvider = (StaticFlatFileDAORefPolicyProvider) refPolicyProvider;
 			// replace any ${PARENT_DIR} placeholder in policy location pattern
 			final String policyLocation = pdpConfEnvProps.replacePlaceholders(fileBasedRefPolicyProvider
 					.getPolicyLocationPattern());
@@ -1412,7 +1412,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 						{
 							// policy directory left empty of versions -> remove
 							// it
-							FlatFileDAOUtils.deleteDirectory(policyDirPath, 0);
+							FlatFileDAOUtils.deleteDirectory(policyDirPath, 1);
 						}
 					} catch (IOException e)
 					{
@@ -1611,7 +1611,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				{
 					// if directory does not exist, this method just returns
 					// right away
-					FlatFileDAOUtils.deleteDirectory(policyDir, 0);
+					FlatFileDAOUtils.deleteDirectory(policyDir, 1);
 				} catch (IOException e)
 				{
 					throw new IOException("Error removing policy directory: " + policyDir);
@@ -1676,7 +1676,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			{
 				if (Files.exists(domainDirPath, LinkOption.NOFOLLOW_LINKS))
 				{
-					FlatFileDAOUtils.deleteDirectory(domainDirPath, 2);
+					FlatFileDAOUtils.deleteDirectory(domainDirPath, 3);
 				}
 
 				synchronized (domainsRootDir)
@@ -2003,7 +2003,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				/*
 				 * Create/initialize new domain directory from domain template directory
 				 */
-				FlatFileDAOUtils.copyDirectory(this.domainTmplDirPath, domainDir, 2);
+				FlatFileDAOUtils.copyDirectory(this.domainTmplDirPath, domainDir, 3);
 			}
 
 			addDomainToCacheAfterDirectoryCreated(domainId, domainDir, props);

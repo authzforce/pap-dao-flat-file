@@ -46,8 +46,8 @@ import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluator;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicySetEvaluator;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
-import org.ow2.authzforce.pap.dao.file.xmlns.StaticFileBasedDAORefPolicyProvider;
 import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
+import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDAORefPolicyProvider;
 import org.springframework.util.ResourceUtils;
 
 /**
@@ -111,7 +111,7 @@ public final class FlatFileDAORefPolicyProviderModule implements RefPolicyProvid
 	 * Module factory
 	 *
 	 */
-	public static class Factory extends RefPolicyProviderModule.Factory<StaticFileBasedDAORefPolicyProvider>
+	public static class Factory extends RefPolicyProviderModule.Factory<StaticFlatFileDAORefPolicyProvider>
 	{
 		private static final IllegalArgumentException ILLEGAL_COMBINING_ALG_REGISTRY_ARGUMENT_EXCEPTION = new IllegalArgumentException(
 				"Undefined CombiningAlgorithm registry");
@@ -121,7 +121,7 @@ public final class FlatFileDAORefPolicyProviderModule implements RefPolicyProvid
 				"Undefined XACML parser factory");
 
 		@Override
-		public RefPolicyProviderModule getInstance(StaticFileBasedDAORefPolicyProvider conf,
+		public RefPolicyProviderModule getInstance(StaticFlatFileDAORefPolicyProvider conf,
 				XACMLParserFactory xacmlParserFactory, int maxPolicySetRefDepth, ExpressionFactory expressionFactory,
 				CombiningAlgRegistry combiningAlgRegistry, EnvironmentProperties environmentProperties)
 				throws IllegalArgumentException
@@ -154,9 +154,9 @@ public final class FlatFileDAORefPolicyProviderModule implements RefPolicyProvid
 		}
 
 		@Override
-		public Class<StaticFileBasedDAORefPolicyProvider> getJaxbClass()
+		public Class<StaticFlatFileDAORefPolicyProvider> getJaxbClass()
 		{
-			return StaticFileBasedDAORefPolicyProvider.class;
+			return StaticFlatFileDAORefPolicyProvider.class;
 		}
 
 	}

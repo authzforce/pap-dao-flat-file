@@ -35,8 +35,7 @@ public final class FlatFileDAOUtils
 {
 	// FIXME: Instead of google BaseEncoding, use
 	// java.util.Base64.getURLEncoder() when moving to Java 8
-	private static final BaseEncoding BASE64URL_NO_PADDING_ENCODING = BaseEncoding
-			.base64Url().omitPadding();
+	private static final BaseEncoding BASE64URL_NO_PADDING_ENCODING = BaseEncoding.base64Url().omitPadding();
 
 	/**
 	 * Encode bytes with base64url specified by RFC 4648, without padding
@@ -51,8 +50,8 @@ public final class FlatFileDAOUtils
 	}
 
 	/**
-	 * Encode string with base64url specified by RFC 4648, without padding. Used
-	 * to create filenames compatible with most filesystems
+	 * Encode string with base64url specified by RFC 4648, without padding. Used to create filenames compatible with
+	 * most filesystems
 	 * 
 	 * @param input
 	 *            input
@@ -60,27 +59,21 @@ public final class FlatFileDAOUtils
 	 */
 	public static String base64UrlEncode(String input)
 	{
-		return BASE64URL_NO_PADDING_ENCODING.encode(input
-				.getBytes(StandardCharsets.UTF_8));
+		return BASE64URL_NO_PADDING_ENCODING.encode(input.getBytes(StandardCharsets.UTF_8));
 	}
 
 	/**
-	 * Decode string encoded with
-	 * {@link FlatFileDAOUtils#base64UrlEncode(String)}
+	 * Decode string encoded with {@link FlatFileDAOUtils#base64UrlEncode(String)}
 	 * 
 	 * @param encoded
 	 *            input
-	 * @return decoded result, i.e. original string encoded with
-	 *         {@link FlatFileDAOUtils#base64UrlEncode(String)}
+	 * @return decoded result, i.e. original string encoded with {@link FlatFileDAOUtils#base64UrlEncode(String)}
 	 * @throws IllegalArgumentException
-	 *             if the input is not a valid encoded string according to
-	 *             base64url encoding without padding
+	 *             if the input is not a valid encoded string according to base64url encoding without padding
 	 */
-	public static String base64UrlDecode(String encoded)
-			throws IllegalArgumentException
+	public static String base64UrlDecode(String encoded) throws IllegalArgumentException
 	{
-		return new String(BASE64URL_NO_PADDING_ENCODING.decode(encoded),
-				StandardCharsets.UTF_8);
+		return new String(BASE64URL_NO_PADDING_ENCODING.decode(encoded), StandardCharsets.UTF_8);
 	}
 
 	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException(
@@ -105,8 +98,7 @@ public final class FlatFileDAOUtils
 	 *             if
 	 *             {@code file == null || !file.exists() || !file.canRead() || (isdirectory && !file.isDirectory()) || (!isdirectory && file.isDirectory()) || (canwrite && !file.canWrite())}
 	 */
-	public static void checkFile(String friendlyname, Path file,
-			boolean isdirectory, boolean canwrite)
+	public static void checkFile(String friendlyname, Path file, boolean isdirectory, boolean canwrite)
 			throws IllegalArgumentException
 	{
 		if (file == null)
@@ -114,8 +106,7 @@ public final class FlatFileDAOUtils
 			throw NULL_FILE_ARGUMENT_EXCEPTION;
 		}
 
-		final String exStartMsg = friendlyname + " = '" + file.toAbsolutePath()
-				+ "' ";
+		final String exStartMsg = friendlyname + " = '" + file.toAbsolutePath() + "' ";
 		if (!Files.exists(file))
 		{
 			throw new IllegalArgumentException(exStartMsg + "not found");
@@ -126,28 +117,23 @@ public final class FlatFileDAOUtils
 		}
 		if (isdirectory && !Files.isDirectory(file))
 		{
-			throw new IllegalArgumentException(exStartMsg
-					+ "is not a directory");
+			throw new IllegalArgumentException(exStartMsg + "is not a directory");
 		}
 		if (!isdirectory && !Files.isDirectory(file))
 		{
-			throw new IllegalArgumentException(exStartMsg
-					+ "is not a normal file");
+			throw new IllegalArgumentException(exStartMsg + "is not a normal file");
 		}
 		if (canwrite && !Files.isWritable(file))
 		{
-			throw new IllegalArgumentException(exStartMsg
-					+ "cannot be written to");
+			throw new IllegalArgumentException(exStartMsg + "cannot be written to");
 		}
 	}
-	
+
 	/**
-	 * Directory entry filter that accepts only regular files with a given
-	 * extension/suffix
+	 * Directory entry filter that accepts only regular files with a given extension/suffix
 	 *
 	 */
-	public static final class SuffixMatchingDirectoryStreamFilter implements
-			DirectoryStream.Filter<Path>
+	public static final class SuffixMatchingDirectoryStreamFilter implements DirectoryStream.Filter<Path>
 	{
 		private final PathMatcher pathSuffixMatcher;
 
@@ -159,15 +145,15 @@ public final class FlatFileDAOUtils
 		 */
 		public SuffixMatchingDirectoryStreamFilter(String suffix)
 		{
-			this.pathSuffixMatcher = FileSystems.getDefault().getPathMatcher(
-					"glob:*" + suffix);
+			this.pathSuffixMatcher = FileSystems.getDefault().getPathMatcher("glob:*" + suffix);
 		}
 
 		@Override
 		public boolean accept(Path entry) throws IOException
 		{
-			return Files.isRegularFile(entry) && Files.isReadable(entry)
-					&& pathSuffixMatcher.matches(entry);
+			final boolean isAccepted = Files.isRegularFile(entry) && Files.isReadable(entry)
+					&& pathSuffixMatcher.matches(entry.getFileName());
+			return isAccepted;
 		}
 	}
 
@@ -184,19 +170,16 @@ public final class FlatFileDAOUtils
 		}
 
 		@Override
-		public FileVisitResult visitFile(Path file,
-				BasicFileAttributes attributes) throws IOException
+		public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException
 		{
 			Files.copy(file, target.resolve(source.relativize(file)));
 			return FileVisitResult.CONTINUE;
 		}
 
 		@Override
-		public FileVisitResult preVisitDirectory(Path directory,
-				BasicFileAttributes attributes) throws IOException
+		public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException
 		{
-			final Path targetDirectory = target.resolve(source
-					.relativize(directory));
+			final Path targetDirectory = target.resolve(source.relativize(directory));
 			try
 			{
 				Files.copy(directory, targetDirectory);
@@ -214,16 +197,18 @@ public final class FlatFileDAOUtils
 	private static FileVisitor<Path> DELETING_FILE_VISITOR = new SimpleFileVisitor<Path>()
 	{
 		@Override
-		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-				throws IOException
+		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException
 		{
-			Files.delete(file);
+			if (attrs.isRegularFile())
+			{
+				Files.delete(file);
+			}
+
 			return FileVisitResult.CONTINUE;
 		}
 
 		@Override
-		public FileVisitResult postVisitDirectory(Path dir, IOException exc)
-				throws IOException
+		public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException
 		{
 
 			if (exc == null)
@@ -239,49 +224,47 @@ public final class FlatFileDAOUtils
 	/**
 	 * Copy a directory recursively to another (does not follow links)
 	 * 
-	 * We could use commons-io library for this, if it were using the new
-	 * java.nio.file API available since Java 7, not the case so far.
+	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not
+	 * the case so far.
 	 * 
 	 * @param source
 	 *            source directory
 	 * @param target
 	 *            target directory
 	 * @param maxDepth
-	 *            maximum number of levels of directories to copy. A value of 0
-	 *            means that only the starting directory is visited.
+	 *            maximum number of levels of directories to copy. A value of 0 means that only the starting directory
+	 *            is visited.
 	 * @throws IllegalArgumentException
 	 *             if the maxDepth parameter is negative
 	 * @throws IOException
 	 *             file copy error
 	 */
-	public static void copyDirectory(Path source, Path target, int maxDepth)
-			throws IOException, IllegalArgumentException
+	public static void copyDirectory(Path source, Path target, int maxDepth) throws IOException,
+			IllegalArgumentException
 	{
-		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(),
-				maxDepth, new CopyingFileVisitor(source, target));
+		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(), maxDepth, new CopyingFileVisitor(source,
+				target));
 	}
 
 	/**
 	 * Delete a directory recursively
 	 * 
-	 * We could use commons-io library for this, if it were using the new
-	 * java.nio.file API available since Java 7, not the case so far.
+	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not
+	 * the case so far.
 	 * 
 	 * @param dir
 	 *            directory
 	 * @param maxDepth
-	 *            maximum number of levels of directories to delete. A value of
-	 *            0 means that only the starting file is visited.
+	 *            maximum number of levels of directories to delete. A value of 0 means that only the starting file is
+	 *            visited.
 	 * @throws IllegalArgumentException
 	 *             if the maxDepth parameter is negative
 	 * @throws IOException
 	 *             file deletion error
 	 */
-	public static void deleteDirectory(Path dir, int maxDepth)
-			throws IOException, IllegalArgumentException
+	public static void deleteDirectory(Path dir, int maxDepth) throws IOException, IllegalArgumentException
 	{
-		Files.walkFileTree(dir, Collections.<FileVisitOption> emptySet(),
-				maxDepth, DELETING_FILE_VISITOR);
+		Files.walkFileTree(dir, Collections.<FileVisitOption> emptySet(), maxDepth, DELETING_FILE_VISITOR);
 	}
 
 	// public static void main(String[] args)

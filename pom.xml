@@ -86,7 +86,7 @@
 						</goals>
 						<configuration>
 							<schemaDirectory>src/main/resources</schemaDirectory>
-							<generatePackage>${project.groupId}.pap.dao.file.xmlns</generatePackage>
+							<generatePackage>${project.groupId}.pap.dao.flatfile.xmlns</generatePackage>
 							<!-- <addCompileSourceRoot>true</addCompileSourceRoot> -->
 						</configuration>
 					</execution>
