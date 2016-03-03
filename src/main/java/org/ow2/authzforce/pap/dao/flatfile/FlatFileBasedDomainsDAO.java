@@ -23,6 +23,8 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
@@ -34,6 +36,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -248,6 +251,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		{
 			throw new RuntimeException("Invalid domain properties schema file", e);
 		}
+	}
+
+	private static final DateFormat UTC_DATE_WITH_MILLIS_FORMATTER = new SimpleDateFormat(
+			"yyyy-MM-dd HH:mm:ss.SSS ('UTC')");
+	static
+	{
+		UTC_DATE_WITH_MILLIS_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
 	private static final DirectoryStream.Filter<Path> DIRECTORY_FILTER = new DirectoryStream.Filter<Path>()
@@ -765,18 +775,21 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		{
 			final long lastModifiedTime = propFile.lastModified();
 			final boolean isFileModified = lastModifiedTime > lastExternalIdSyncedTime;
+			if (LOGGER.isDebugEnabled())
+			{
+				LOGGER.debug(
+						"Domain {}: domain properties file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
+						domainId, propFile, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
+						isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(
+								lastExternalIdSyncedTime)),
+						isFileModified ? " -> updating externalId in externalId-to-domain map" : "");
+			}
+
 			// let's sync
 			lastExternalIdSyncedTime = System.currentTimeMillis();
 			final DomainProperties props = loadProperties();
 			if (isFileModified)
 			{
-				if (LOGGER.isDebugEnabled())
-				{
-					LOGGER.debug(
-							"Domain {}: file '{}' (lastModifiedTime = {}) changed since last sync -> updating externalId in externalId-to-domain map",
-							domainId, propFile, new Date(lastModifiedTime));
-				}
-
 				updateCachedExternalId(props.getExternalId());
 			}
 
@@ -836,17 +849,19 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 				// used policy file is there, checked whether changed since last
 				// sync
-				final long policyLastModifiedTime = Files.getLastModifiedTime(policyPath, LinkOption.NOFOLLOW_LINKS)
+				final long lastModifiedTime = Files.getLastModifiedTime(policyPath, LinkOption.NOFOLLOW_LINKS)
 						.toMillis();
-				if (policyLastModifiedTime > lastPdpSyncedTime)
+				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
+				if (LOGGER.isDebugEnabled())
 				{
-					if (LOGGER.isDebugEnabled())
-					{
-						LOGGER.debug(
-								"Domain {}: policy file '{}' (lastModifiedTime = {}) changed since last sync -> reloading PDP",
-								domainId, policyPath, new Date(policyLastModifiedTime));
-					}
+					LOGGER.debug("Domain {}: policy file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
+							domainId, policyPath, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
+							isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(
+									lastPdpSyncedTime)), isFileModified ? " -> reloading PDP" : "");
+				}
 
+				if (isFileModified)
+				{
 					reloadPDP();
 					return true;
 				}
@@ -866,16 +881,19 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		private boolean syncPDP() throws IllegalArgumentException, IOException
 		{
 			// Check for change in PDP's main conf file
-			final long pdpConfLastModifiedTime = pdpConfFile.lastModified();
-			if (pdpConfLastModifiedTime > lastPdpSyncedTime)
+			final long lastModifiedTime = pdpConfFile.lastModified();
+			final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
+			if (LOGGER.isDebugEnabled())
 			{
-				if (LOGGER.isDebugEnabled())
-				{
-					LOGGER.debug(
-							"Domain {}: PDP conf file '{}' (lastModifiedTime = {}) changed since last sync -> reloading PDP",
-							domainId, pdpConfFile, new Date(pdpConfLastModifiedTime));
-				}
+				LOGGER.debug("Domain {}: PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
+						domainId, pdpConfFile, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
+						isFileModified ? ">" : "<=",
+						UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
+						isFileModified ? " -> reloading PDP" : "");
+			}
 
+			if (isFileModified)
+			{
 				reloadPDP();
 				return true;
 			}
@@ -967,7 +985,15 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			synchronized (domainDirPath)
 			{
 				final long lastModifiedTime = pdpConfFile.lastModified();
-				final boolean isPdpConfModified = lastModifiedTime > lastPdpSyncedTime;
+				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
+				if (LOGGER.isDebugEnabled())
+				{
+					LOGGER.debug("Domain {}: PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
+							domainId, pdpConfFile, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
+							isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(
+									lastPdpSyncedTime)), isFileModified ? " -> reload PDP" : "");
+				}
+
 				// let's sync
 				lastPdpSyncedTime = System.currentTimeMillis();
 				// Get current PDP conf that we have to change (only part of it)
@@ -981,15 +1007,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 							+ " as expected.");
 				}
 
-				if (isPdpConfModified)
+				if (isFileModified)
 				{
-					if (LOGGER.isDebugEnabled())
-					{
-						LOGGER.debug(
-								"Domain {}: PDP conf file '{}' (lastModifiedTime = {}) changed since last sync -> reloading PDP",
-								domainId, pdpConfFile, new Date(lastModifiedTime));
-					}
-
 					reloadPDP(pdpConf);
 				} else
 				{
@@ -1072,18 +1091,19 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			{
 				final long lastModifiedTime = pdpConfFile.lastModified();
 				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
+				if (LOGGER.isDebugEnabled())
+				{
+					LOGGER.debug("Domain {}: PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
+							domainId, pdpConfFile, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
+							isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(
+									lastPdpSyncedTime)), isFileModified ? " -> reloading PDP" : "");
+				}
+
 				// let's sync
 				lastPdpSyncedTime = System.currentTimeMillis();
 				pdpConf = loadPDPConfTmpl();
 				if (isFileModified)
 				{
-					if (LOGGER.isDebugEnabled())
-					{
-						LOGGER.debug(
-								"Domain {}: PDP conf file '{}' (lastModifiedTime = {}) changed since last sync -> reloading PDP",
-								domainId, pdpConfFile, new Date(lastModifiedTime));
-					}
-
 					reloadPDP(pdpConf);
 				}
 			}
