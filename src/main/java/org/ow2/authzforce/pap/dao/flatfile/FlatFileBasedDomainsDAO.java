@@ -32,7 +32,6 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
@@ -75,6 +74,7 @@ import org.ow2.authzforce.core.pdp.impl.DefaultEnvironmentProperties;
 import org.ow2.authzforce.core.pdp.impl.PDPImpl;
 import org.ow2.authzforce.core.pdp.impl.PdpConfigurationParser;
 import org.ow2.authzforce.core.pdp.impl.PdpModelHandler;
+import org.ow2.authzforce.core.pdp.impl.policy.StaticApplicablePolicyView;
 import org.ow2.authzforce.core.xmlns.pdp.Pdp;
 import org.ow2.authzforce.core.xmlns.pdp.StaticRefBasedRootPolicyProvider;
 import org.ow2.authzforce.pap.dao.flatfile.xmlns.DomainProperties;
@@ -151,17 +151,17 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 		private final IdReferenceType rootPolicyRef;
 		private final long lastModified;
-		private final List<IdReferenceType> enabledPolicies;
+		private final List<IdReferenceType> refPolicyRefs;
 
 		private ReadablePdpPropertiesImpl(IdReferenceType rootPolicyRef, long lastModified,
-				List<IdReferenceType> enabledPolicies)
+				List<IdReferenceType> refPolicyRefs)
 		{
 			assert rootPolicyRef != null;
-			assert enabledPolicies != null && !enabledPolicies.isEmpty();
+			assert refPolicyRefs != null;
 
 			this.rootPolicyRef = rootPolicyRef;
 			this.lastModified = lastModified;
-			this.enabledPolicies = enabledPolicies;
+			this.refPolicyRefs = refPolicyRefs;
 		}
 
 		@Override
@@ -177,9 +177,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public List<IdReferenceType> getEnabledPolicies()
+		public List<IdReferenceType> getRefPolicyRefs()
 		{
-			return this.enabledPolicies;
+			return this.refPolicyRefs;
 		}
 
 	}
@@ -612,8 +612,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			// Check that all policies used by PDP are statically resolved
 			// Indeed, dynamic policy resolution is not supported by this PAP
 			// DAO implementation
-			final Map<String, PolicyVersion> staticPoliciesById = pdp.getStaticRootAndRefPolicies();
-			if (staticPoliciesById == null)
+			final StaticApplicablePolicyView pdpApplicablePolicies = pdp.getStaticApplicablePolicies();
+			if (pdpApplicablePolicies == null)
 			{
 				throw ILLEGAL_POLICY_NOT_STATIC_EXCEPTION;
 			}
@@ -831,13 +831,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 		private boolean syncPdpPolicies() throws IllegalArgumentException, IOException
 		{
-			final Map<String, PolicyVersion> usedPolicies = pdp.getStaticRootAndRefPolicies();
-			if (usedPolicies == null)
+			final StaticApplicablePolicyView pdpApplicablePolicies = pdp.getStaticApplicablePolicies();
+			if (pdpApplicablePolicies == null)
 			{
 				throw NON_STATIC_POLICY_EXCEPTION;
 			}
 
-			for (final Entry<String, PolicyVersion> usedPolicy : usedPolicies.entrySet())
+			for (final Entry<String, PolicyVersion> usedPolicy : pdpApplicablePolicies)
 			{
 				final Path policyPath = getPolicyVersionPath(usedPolicy.getKey(), usedPolicy.getValue());
 				if (!Files.exists(policyPath, LinkOption.NOFOLLOW_LINKS))
@@ -951,14 +951,14 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					syncPdpPolicies();
 				}
 
-				final Map<String, PolicyVersion> pdpEnabledPolicyMap = pdp.getStaticRootAndRefPolicies();
-				if (pdpEnabledPolicyMap == null)
+				final StaticApplicablePolicyView pdpApplicablePolicies = pdp.getStaticApplicablePolicies();
+				if (pdpApplicablePolicies == null)
 				{
 					throw NON_STATIC_POLICY_EXCEPTION;
 				}
 
 				matchedPolicyRefs = new ArrayList<>();
-				for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpEnabledPolicyMap.entrySet())
+				for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpApplicablePolicies)
 				{
 					matchedPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(), enabledPolicyEntry
 							.getValue().toString(), null, null));
@@ -1015,14 +1015,14 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					syncPdpPolicies();
 				}
 
-				final Map<String, PolicyVersion> pdpEnabledPolicyMap = pdp.getStaticRootAndRefPolicies();
-				if (pdpEnabledPolicyMap == null)
+				final StaticApplicablePolicyView pdpApplicablePolicies = pdp.getStaticApplicablePolicies();
+				if (pdpApplicablePolicies == null)
 				{
 					throw NON_STATIC_POLICY_EXCEPTION;
 				}
 
 				matchedPolicyRefs = new ArrayList<>();
-				for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpEnabledPolicyMap.entrySet())
+				for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpApplicablePolicies)
 				{
 					matchedPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(), enabledPolicyEntry
 							.getValue().toString(), null, null));
@@ -1224,7 +1224,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					 */
 					if (maxNumOfPoliciesPerDomain > 0)
 					{
-						int policyCount = 0;
+						int existingPolicyCount = 0;
 						try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(
 								policyParentDirPath, DIRECTORY_FILTER))
 						{
@@ -1232,7 +1232,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 							while (policyDirIterator.hasNext())
 							{
 								policyDirIterator.next();
-								policyCount++;
+								existingPolicyCount++;
 							}
 						} catch (IOException e)
 						{
@@ -1240,8 +1240,12 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 									+ "' of domain '" + domainId + "'", e);
 						}
 
-						if (policyCount > maxNumOfPoliciesPerDomain)
+						if (existingPolicyCount >= maxNumOfPoliciesPerDomain)
 						{
+							/*
+							 * We already reached or exceeded the max, so if we add one more as we are about to do, we
+							 * have too many anyway (existingPolicyCount > maxNumOfPoliciesPerDomain)
+							 */
 							throw maxNumOfPoliciesReachedException;
 						}
 					}
@@ -1262,16 +1266,18 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				final int excessOfPolicyVersionsToBeRemoved;
 
 				/*
-				 * New policy version. Check whether number of versions > max
+				 * New policy version. Check whether number of versions >= max
 				 */
 				if (maxNumOfVersionsPerPolicy > 0)
 				{
 					excessOfPolicyVersionsToBeRemoved = policyVersions.size() - maxNumOfVersionsPerPolicy;
 					/*
-					 * if too many versions after adding the new one, but we will not remove any to fix it, then throw
-					 * an error
+					 * if excessOfPolicyVersionsToBeRemoved >= 0, we cannot add one more (in which case we would have:
+					 * excessOfPolicyVersionsToBeRemoved > 0, i.e. policyVersions.size() > policyVersions.size(). In
+					 * this case, if we don't remove any version to fix it because removeOldestVersionsIfMaxExceeded
+					 * property is false , then throw an error
 					 */
-					if (excessOfPolicyVersionsToBeRemoved > 0 && !removeOldestVersionsIfMaxExceeded)
+					if (excessOfPolicyVersionsToBeRemoved >= 0 && !removeOldestVersionsIfMaxExceeded)
 					{
 						/*
 						 * Oldest versions will not be removed, therefore we cannot add policies anymore without
@@ -1294,7 +1300,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				// Let's sync the PDP first before we check the actual active
 				// policies
 				syncPDP();
-				final PolicyVersion requiredPolicyVersion = pdp.getStaticRootAndRefPolicies().get(policyId);
+				final PolicyVersion requiredPolicyVersion = pdp.getStaticApplicablePolicies().get(policyId);
 				if (requiredPolicyVersion != null)
 				{
 					/*
@@ -1402,7 +1408,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				 * Check whether it is not used by the PDP. First make sure the PDP is up-to-date with the repository
 				 */
 				syncPDP();
-				final PolicyVersion requiredPolicyVersion = pdp.getStaticRootAndRefPolicies().get(policyId);
+				final PolicyVersion requiredPolicyVersion = pdp.getStaticApplicablePolicies().get(policyId);
 				if (requiredPolicyVersion != null && requiredPolicyVersion.equals(version))
 				{
 					throw new IllegalArgumentException(
@@ -1614,7 +1620,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			synchronized (domainDirPath)
 			{
 				syncPDP();
-				requiredPolicyVersion = pdp.getStaticRootAndRefPolicies().get(policyId);
+				requiredPolicyVersion = pdp.getStaticApplicablePolicies().get(policyId);
 				if (requiredPolicyVersion != null)
 				{
 					throw new IllegalArgumentException(
