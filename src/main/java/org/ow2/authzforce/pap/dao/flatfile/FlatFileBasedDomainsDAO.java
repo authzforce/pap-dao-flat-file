@@ -107,6 +107,10 @@ import com.fasterxml.uuid.impl.TimeBasedGenerator;
 public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVersionDAOClient, POLICY_DAO_CLIENT extends PolicyDAOClient, DOMAIN_DAO_CLIENT extends DomainDAOClient<FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>>>
 		implements DomainsDAO<DOMAIN_DAO_CLIENT>
 {
+	/**
+	 * DOMAIN FILE SYNC THREAD SHUTDOWN TIMEOUT (seconds)
+	 */
+	public static final int SYNC_SERVICE_SHUTDOWN_TIMEOUT_SEC = 10;
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(FlatFileBasedDomainsDAO.class);
 
@@ -368,6 +372,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 	private final class FileBasedDomainDAOImpl implements FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>
 	{
+
 		private final String domainId;
 
 		private final Path domainDirPath;
@@ -588,7 +593,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Reload PDP from configuration files, (including policy files, aka "PRP" in XACML)
+		 * Reload PDP from configuration files, (including policy files, aka "PRP" in XACML). This method first sets
+		 * lastPdpSyncedTime to the current time.
 		 * 
 		 * @throws IOException
 		 *             I/O error reading from confFile
@@ -651,6 +657,16 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 
 			pdp = newPDP;
+		}
+
+		private void setPdpInErrorState() throws IOException
+		{
+			if (pdp != null)
+			{
+				pdp.close();
+			}
+
+			pdp = null;
 		}
 
 		private void saveProperties(WritableDomainProperties props) throws IOException
@@ -829,6 +845,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 		}
 
+		/**
+		 * Sync PDP's applicable policies with the policy repository on the filesystem
+		 * 
+		 * @return true iff the PDP was reloaded during the process, i.e. if some change to policy files was found
+		 * @throws IllegalArgumentException
+		 * @throws IOException
+		 */
 		private boolean syncPdpPolicies() throws IllegalArgumentException, IOException
 		{
 			final StaticApplicablePolicyView pdpApplicablePolicies = pdp.getStaticApplicablePolicies();
@@ -839,30 +862,71 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 			for (final Entry<String, PolicyVersion> usedPolicy : pdpApplicablePolicies)
 			{
-				final Path policyPath = getPolicyVersionPath(usedPolicy.getKey(), usedPolicy.getValue());
-				if (!Files.exists(policyPath, LinkOption.NOFOLLOW_LINKS))
+				/*
+				 * Check whether there is any change to the directory of this policy, in which case we have to reload
+				 * the PDP to take any account any new version that might match the direct/indirect policy references
+				 * from the root policy
+				 */
+				final String policyId = usedPolicy.getKey();
+				final Path policyDir = getPolicyDirectory(policyId);
+				if (!Files.exists(policyDir, LinkOption.NOFOLLOW_LINKS))
 				{
-					// used policy file removed, this is a significant change
-					reloadPDP();
+					// used policy file has been removed, this is a significant change
+					try
+					{
+						reloadPDP();
+					} catch (Throwable t)
+					{
+						/*
+						 * a critical error occurred, maybe because the deleted policy is still referenced by the root
+						 * policy anyway, this means the PDP configuration or policies in the domain directory are in a
+						 * bad state
+						 */
+						setPdpInErrorState();
+						throw new RuntimeException(
+								"Unrecoverable error occurred when reloading the PDP after detecting the removal of a policy ('"
+										+ policyId
+										+ "') - previously used by the PDP - from the backend domain repository. Setting the PDP in error state until following errors are fixed by the administrator and the PDP re-synced via the PAP API",
+								t);
+					}
+
 					return true;
 				}
 
 				// used policy file is there, checked whether changed since last
 				// sync
-				final long lastModifiedTime = Files.getLastModifiedTime(policyPath, LinkOption.NOFOLLOW_LINKS)
+				final long lastModifiedTime = Files.getLastModifiedTime(policyDir, LinkOption.NOFOLLOW_LINKS)
 						.toMillis();
 				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
 				if (LOGGER.isDebugEnabled())
 				{
-					LOGGER.debug("Domain {}: policy file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
-							domainId, policyPath, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
-							isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(
-									lastPdpSyncedTime)), isFileModified ? " -> reloading PDP" : "");
+					LOGGER.debug(
+							"Domain {}: policy '{}': file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
+							domainId, policyId, policyDir, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(
+									lastModifiedTime)), isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER
+									.format(new Date(lastPdpSyncedTime)), isFileModified ? " -> reloading PDP" : "");
 				}
 
 				if (isFileModified)
 				{
-					reloadPDP();
+					try
+					{
+						reloadPDP();
+					} catch (Throwable t)
+					{
+						/*
+						 * a critical error occurred, maybe because the deleted policy is still referenced by the root
+						 * policy anyway, this means the PDP configuration or policies in the domain directory are in a
+						 * bad state
+						 */
+						setPdpInErrorState();
+						throw new RuntimeException(
+								"Unrecoverable error occurred when reloading the PDP after detecting a change to the policy ('"
+										+ policyId
+										+ "') - used by the PDP - in the backend domain repository. Setting the PDP in error state until following errors are fixed by the administrator and the PDP re-synced via the PAP API",
+								t);
+					}
+
 					return true;
 				}
 			}
@@ -902,6 +966,27 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			return syncPdpPolicies();
 		}
 
+		private ReadablePdpProperties getPropertiesFromPdpApplicablePolicies()
+		{
+			final StaticApplicablePolicyView pdpApplicablePolicies = pdp.getStaticApplicablePolicies();
+			if (pdpApplicablePolicies == null)
+			{
+				throw NON_STATIC_POLICY_EXCEPTION;
+			}
+
+			final List<IdReferenceType> applicableRefPolicyRefs = new ArrayList<>();
+			final IdReferenceType staticRootPolicyRef = new IdReferenceType(pdpApplicablePolicies.rootPolicyId(),
+					pdpApplicablePolicies.rootPolicyVersion().toString(), null, null);
+			for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpApplicablePolicies.refPolicies().entrySet())
+			{
+				applicableRefPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(), enabledPolicyEntry
+						.getValue().toString(), null, null));
+			}
+
+			// Java is pass-by-value, therefore we can pass the primitive value lastPdpSyncedTime to returned object
+			return new ReadablePdpPropertiesImpl(staticRootPolicyRef, lastPdpSyncedTime, applicableRefPolicyRefs);
+		}
+
 		@Override
 		public ReadablePdpProperties setOtherPdpProperties(WritablePdpProperties properties) throws IOException,
 				IllegalArgumentException
@@ -917,11 +1002,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				throw NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION;
 			}
 
-			final long lastPdpSyncedTimeCopy;
-			final List<IdReferenceType> matchedPolicyRefs;
 			synchronized (domainDirPath)
 			{
-				lastPdpSyncedTime = System.currentTimeMillis();
+				final long pdpConfLastSyncTime = System.currentTimeMillis();
 				// Get current PDP conf that we have to change (only part of it)
 				final Pdp pdpConf = loadPDPConfTmpl();
 				/*
@@ -942,46 +1025,28 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				// rootPolicyRef
 				if (!newRootPolicyRef.equals(staticRefBasedRootPolicyProvider.getPolicyRef()))
 				{
+					lastPdpSyncedTime = pdpConfLastSyncTime;
 					staticRefBasedRootPolicyProvider.setPolicyRef(newRootPolicyRef);
 					reloadPDP(pdpConf);
 				} else
 				{
-					// no reload but we sill need to sync PDP to make sure
-					// pdp.getStaticRootAndRefPolicies() is up-to-date
-					syncPdpPolicies();
+					// Sync policies to make sure pdp.getStaticRootAndRefPolicies() is up-to-date
+					final boolean isPdpReloaded = syncPdpPolicies();
+					// If no PDP reload occurred take pdpConfLastSyncTime as lastPdpSyncedTime
+					if (!isPdpReloaded)
+					{
+						lastPdpSyncedTime = pdpConfLastSyncTime;
+					}
 				}
 
-				final StaticApplicablePolicyView pdpApplicablePolicies = pdp.getStaticApplicablePolicies();
-				if (pdpApplicablePolicies == null)
-				{
-					throw NON_STATIC_POLICY_EXCEPTION;
-				}
-
-				matchedPolicyRefs = new ArrayList<>();
-				for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpApplicablePolicies)
-				{
-					matchedPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(), enabledPolicyEntry
-							.getValue().toString(), null, null));
-				}
-
-				/*
-				 * lastPdpSyncedTime is not final, therefore we make a defensive copy of the current value of
-				 * lastPdpSyncedTime before returning in case another thread messes with it after we quit the
-				 * synchronized block. This is a primitive type, so assignment copies the value.
-				 */
-				lastPdpSyncedTimeCopy = lastPdpSyncedTime;
+				return getPropertiesFromPdpApplicablePolicies();
 			}
-
-			return new ReadablePdpPropertiesImpl(newRootPolicyRef, lastPdpSyncedTimeCopy, matchedPolicyRefs);
 		}
 
 		@Override
 		public ReadablePdpProperties getOtherPdpProperties() throws IOException
 		{
-
-			final long lastPdpSyncedTimeCopy;
 			final AbstractPolicyProvider rootPolicyProvider;
-			final List<IdReferenceType> matchedPolicyRefs;
 			synchronized (domainDirPath)
 			{
 				final long lastModifiedTime = pdpConfFile.lastModified();
@@ -995,7 +1060,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				}
 
 				// let's sync
-				lastPdpSyncedTime = System.currentTimeMillis();
+				final long pdpConfLastSyncedTime = System.currentTimeMillis();
 				// Get current PDP conf that we have to change (only part of it)
 				final Pdp pdpConf = loadPDPConfTmpl();
 				rootPolicyProvider = pdpConf.getRootPolicyProvider();
@@ -1009,36 +1074,21 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 				if (isFileModified)
 				{
+					// then PDP's last sync time is same as last time PDP conf was loaded/synced
+					lastPdpSyncedTime = pdpConfLastSyncedTime;
 					reloadPDP(pdpConf);
 				} else
 				{
-					syncPdpPolicies();
+					final boolean isPdpReloaded = syncPdpPolicies();
+					// if reloaded, lastPdpSyncedTime is already set properly, else we set it here
+					if (!isPdpReloaded)
+					{
+						lastPdpSyncedTime = pdpConfLastSyncedTime;
+					}
 				}
 
-				final StaticApplicablePolicyView pdpApplicablePolicies = pdp.getStaticApplicablePolicies();
-				if (pdpApplicablePolicies == null)
-				{
-					throw NON_STATIC_POLICY_EXCEPTION;
-				}
-
-				matchedPolicyRefs = new ArrayList<>();
-				for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpApplicablePolicies)
-				{
-					matchedPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(), enabledPolicyEntry
-							.getValue().toString(), null, null));
-				}
-
-				/*
-				 * lastPdpSyncedTime is not final, therefore we make a defensive copy of the current value of
-				 * lastPdpSyncedTime before returning in case another thread messes with it after we quit the
-				 * synchronized block. This is a primitive type, so assignment copies the value.
-				 */
-				lastPdpSyncedTimeCopy = lastPdpSyncedTime;
+				return getPropertiesFromPdpApplicablePolicies();
 			}
-
-			final StaticRefBasedRootPolicyProvider staticRefBasedRootPolicyProvider = (StaticRefBasedRootPolicyProvider) rootPolicyProvider;
-			return new ReadablePdpPropertiesImpl(staticRefBasedRootPolicyProvider.getPolicyRef(),
-					lastPdpSyncedTimeCopy, matchedPolicyRefs);
 		}
 
 		/**
@@ -1100,10 +1150,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				}
 
 				// let's sync
-				lastPdpSyncedTime = System.currentTimeMillis();
+				final long pdpConfLastLoadTime = System.currentTimeMillis();
 				pdpConf = loadPDPConfTmpl();
 				if (isFileModified)
 				{
+					lastPdpSyncedTime = pdpConfLastLoadTime;
 					reloadPDP(pdpConf);
 				}
 			}
@@ -1270,14 +1321,18 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				 */
 				if (maxNumOfVersionsPerPolicy > 0)
 				{
-					excessOfPolicyVersionsToBeRemoved = policyVersions.size() - maxNumOfVersionsPerPolicy;
 					/*
-					 * if excessOfPolicyVersionsToBeRemoved >= 0, we cannot add one more (in which case we would have:
-					 * excessOfPolicyVersionsToBeRemoved > 0, i.e. policyVersions.size() > policyVersions.size(). In
-					 * this case, if we don't remove any version to fix it because removeOldestVersionsIfMaxExceeded
-					 * property is false , then throw an error
+					 * Number of policies to remove in case auto removal of excess versions is enabled is: number of
+					 * current versions + the new one to be added - max
 					 */
-					if (excessOfPolicyVersionsToBeRemoved >= 0 && !removeOldestVersionsIfMaxExceeded)
+					excessOfPolicyVersionsToBeRemoved = policyVersions.size() + 1 - maxNumOfVersionsPerPolicy;
+					/*
+					 * if excessOfPolicyVersionsToBeRemoved > 0, we cannot add one more (that would cause
+					 * policyVersions.size() > maxNumOfVersionsPerPolicy). In this case, if
+					 * removeOldestVersionsIfMaxExceeded property is false, we cannot remove any version to allow for
+					 * the new one -> throw an error
+					 */
+					if (excessOfPolicyVersionsToBeRemoved > 0 && !removeOldestVersionsIfMaxExceeded)
 					{
 						/*
 						 * Oldest versions will not be removed, therefore we cannot add policies anymore without
@@ -1728,7 +1783,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				try
 				{
 					// Wait a while for existing tasks to terminate
-					if (!dirToMemSyncScheduler.awaitTermination(domainDirToMemSyncIntervalSec, TimeUnit.SECONDS))
+					if (!dirToMemSyncScheduler.awaitTermination(SYNC_SERVICE_SHUTDOWN_TIMEOUT_SEC, TimeUnit.SECONDS))
 					{
 						LOGGER.error(
 								"Domain {}: scheduler wait timeout ({}s) occurred before task could terminate after shutdown request.",
@@ -1737,7 +1792,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 																// executing
 																// tasks
 						// Wait a while for tasks to respond to being cancelled
-						if (!dirToMemSyncScheduler.awaitTermination(domainDirToMemSyncIntervalSec, TimeUnit.SECONDS))
+						if (!dirToMemSyncScheduler
+								.awaitTermination(SYNC_SERVICE_SHUTDOWN_TIMEOUT_SEC, TimeUnit.SECONDS))
 						{
 							LOGGER.error(
 									"Domain {}: scheduler wait timeout ({}s) occurred before task could terminate after shudownNow request.",
