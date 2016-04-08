@@ -1,7 +1,7 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
-## Unreleased
+## 4.0.0
 ### Added
 - Option for policy version rolling (automatic removal of oldest versions if maximum allowed number of versions for a policy is reached)
 - Use of new PdpImpl#getStaticApplicablePolicies() to check policies required by PDP before removing any policy (version)
