@@ -3,14 +3,21 @@ All notable changes to this project are documented in this file following the [K
 
 ## Unreleased
 ### Added
-- Option for automatic removal of oldest versions if maximum allowed number of versions for a policy is reached
-- Use of new PdpImpl#getStaticRootAndRefPolicies() to check policies required by PDP before removing any policy (version)
+- Option for policy version rolling (automatic removal of oldest versions if maximum allowed number of versions for a policy is reached)
+- Use of new PdpImpl#getStaticApplicablePolicies() to check policies required by PDP before removing any policy (version)
 - Manual synchronization of domains:
   - FlatFileBasedDomainsDAO#getDomainIDs() forces re-synchronization of all domains
   - FlatFileBasedDomainDAO#get*() methods force re-synchronization of the domain to make sure the returned data is up-to-date
   - FlatFileBasedDomainDAO#removeDomain() removes the domain from cache even if the domain directory is already deleted on disk
 
 ### Changed
+- Version of supported PAP core API (authzforce-ce-core-pap-api): 4.0.0, i.e. new features:
+	- Get latest version of given policy in a domain
+	- Get new PDP-specific properties of a domain: enabled policies (applicable by the PDP), last modified time (last time PDP was instantiated, in particular when synced with the domain data directory)
+	- Get/enable PDP feature 'Multiple Decision Profile' for a domain
+	- Get/set new PRP-specific properties of a domain: max policy count per domain, max version count per policy,  version rolling (enable automatic rolling of versions when max version count per policy is reached)
+	- PolicyVersion class used for policy versions (instead of String)
+- Version of backend PDP core implementation (authzforce-ce-core): 3.8.0
 - Namespace of XML schema of domain properties changed from "http://authzforce.github.io/pap-dao-file/xmlns/properties/3.6" to "http://authzforce.github.io/pap-dao-flat-file/xmlns/properties/3.6"
 - Namespace of XML schema of refPolicyProvider (PDP extension) changed from "http://authzforce.github.io/pap-dao-file/xmlns/pdp-ext/3.6" to "http://authzforce.github.io/pap-dao-flat-file/xmlns/pdp-ext/3.6"
 - XML type of the refPolicyProvider (in previously mentioned schema) changed from 'StaticFileBasedDAORefPolicyProvider' to 'StaticFlatFileDAORefPolicyProvider'
@@ -19,9 +26,6 @@ All notable changes to this project are documented in this file following the [K
   - If the domain's directory found missing by the synchronizing thread, the thread deletes the domain from cache.
   - If any change to properties.xml (domain description, externalId) detected, externalId updated in cache
   - If any change to pdp.xml or the file of any policy used by the PDP, the PDP is reloaded.
-- Version of implemented PAP API (dependency 'core-pap-api'): 4.0.0; in particular:
-    - PolicyVersion type used for policy versions (instead of String)
-    - Implemented getLatestPolicyVersion(policyId) to get latest version of a given policy
 
 
 ## 3.6.1
