@@ -19,6 +19,6 @@
     along with AuthZForce CE.  If not, see <http://www.gnu.org/licenses/>.
 
 -->
-<p:domainProperties externalId="external123" xmlns:p="http://authzforce.github.io/pap-dao-file/xmlns/3.6" xmlns:tns="http://authzforce.github.io/xmlns/pdp/ext/3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://authzforce.github.io/pap-dao-file/xmlns/3.6 ../../main/resources/org.ow2.authzforce.pap.dao.file.xsd ">
+<p:domainProperties externalId="external123" xmlns:p="http://authzforce.github.io/pap-dao-flat-file/xmlns/3.6" xmlns:tns="http://authzforce.github.io/xmlns/pdp/ext/3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <p:description>p:description</p:description>
 </p:domainProperties>

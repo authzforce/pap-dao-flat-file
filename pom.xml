@@ -5,17 +5,17 @@
 		<artifactId>authzforce-ce-parent</artifactId>
 		<version>3.3.7</version>
 	</parent>
-	<artifactId>authzforce-ce-pap-dao-file</artifactId>
-	<version>3.6.1</version>
+	<artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
+	<version>4.0.0</version>
 	<name>${project.groupId}:${project.artifactId}</name>
-	<description>AuthZForce CE - File-based PAP DAO implementation</description>
+	<description>AuthZForce CE - PAP DAO implementation based on flat file database</description>
 	<url>https://tuleap.ow2.org/projects/authzforce</url>
 	<scm>
-		<connection>scm:git:${git.url.base}/pap-dao-file.git</connection>
-		<developerConnection>scm:git:${git.url.base}/pap-dao-file.git</developerConnection>
+		<connection>scm:git:${git.url.base}/pap-dao-flat-file.git</connection>
+		<developerConnection>scm:git:${git.url.base}/pap-dao-flat-file.git</developerConnection>
 		<tag>HEAD</tag>
 		<!-- Publicly browsable repository URL. For example, via Gitlab web UI. -->
-		<url>${git.url.base}/pap-dao-file</url>
+		<url>${git.url.base}/pap-dao-flat-file</url>
 	</scm>
 	<dependencies>
 		<!-- Third-party dependencies -->
@@ -30,21 +30,16 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
-		<dependency>
-			<groupId>commons-io</groupId>
-			<artifactId>commons-io</artifactId>
-			<version>2.4</version>
-		</dependency>
 		<!-- AuthZForce dependencies -->
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>${artifactId.prefix}-core-pap-api</artifactId>
-			<version>3.6.0</version>
+			<version>4.0.0</version>
 		</dependency>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>${artifactId.prefix}-core</artifactId>
-			<version>3.7.0</version>
+			<version>3.8.0</version>
 		</dependency>
 	</dependencies>
 	<build>
@@ -91,7 +86,7 @@
 						</goals>
 						<configuration>
 							<schemaDirectory>src/main/resources</schemaDirectory>
-							<generatePackage>${project.groupId}.pap.dao.file.xmlns</generatePackage>
+							<generatePackage>${project.groupId}.pap.dao.flatfile.xmlns</generatePackage>
 							<!-- <addCompileSourceRoot>true</addCompileSourceRoot> -->
 						</configuration>
 					</execution>

@@ -1,1 +1,1 @@
-org.ow2.authzforce.pap.dao.file.FileBasedDAORefPolicyProviderModule$Factory
+org.ow2.authzforce.pap.dao.flatfile.FlatFileDAORefPolicyProviderModule$Factory
