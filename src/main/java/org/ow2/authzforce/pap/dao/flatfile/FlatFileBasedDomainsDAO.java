@@ -56,6 +56,9 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import oasis.names.tc.xacml._3_0.core.schema.wd_17.IdReferenceType;
+import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
+
 import org.ow2.authzforce.core.pap.api.dao.DomainDAOClient;
 import org.ow2.authzforce.core.pap.api.dao.DomainsDAO;
 import org.ow2.authzforce.core.pap.api.dao.PolicyDAOClient;
@@ -92,9 +95,6 @@ import org.xml.sax.SAXException;
 import com.fasterxml.uuid.EthernetAddress;
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedGenerator;
-
-import oasis.names.tc.xacml._3_0.core.schema.wd_17.IdReferenceType;
-import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
 
 /**
  * Filesystem-based policy domain repository DAO
@@ -192,28 +192,37 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	{
 
 		private final List<String> featureIDs;
-		private final IdReferenceType rootPolicyRef;
-		private final List<IdReferenceType> refPolicyRefs;
+		private final IdReferenceType rootPolicyRefExpression;
+		private final IdReferenceType applicableRootPolicyRef;
+		private final List<IdReferenceType> applicableRefPolicyRefs;
 		private final long lastModified;
 
-		private ReadablePdpPropertiesImpl(List<String> featureIDs, IdReferenceType rootPolicyRef, List<IdReferenceType> refPolicyRefs, long lastModified)
+		private ReadablePdpPropertiesImpl(List<String> featureIDs, IdReferenceType rootPolicyRefExpression, IdReferenceType applicableRootPolicyRef, List<IdReferenceType> applicableRefPolicyRefs, long lastModified)
 		{
-			assert rootPolicyRef != null;
-			assert refPolicyRefs != null;
+			assert rootPolicyRefExpression != null;
+			assert applicableRootPolicyRef != null;
+			assert applicableRefPolicyRefs != null;
 			assert featureIDs != null;
 
 			this.featureIDs = featureIDs;
-			this.rootPolicyRef = rootPolicyRef;
-			this.refPolicyRefs = refPolicyRefs;
+			this.rootPolicyRefExpression = rootPolicyRefExpression;
+			this.applicableRootPolicyRef = applicableRootPolicyRef;
+			this.applicableRefPolicyRefs = applicableRefPolicyRefs;
 			this.lastModified = lastModified;
+		}
+		
+		@Override
+		public List<String> getFeatureIDs()
+		{
+			return this.featureIDs;
 		}
 
 		@Override
-		public IdReferenceType getRootPolicyRef()
+		public IdReferenceType getRootPolicyRefExpression()
 		{
-			return this.rootPolicyRef;
+			return rootPolicyRefExpression;
 		}
-
+		
 		@Override
 		public long getLastModified()
 		{
@@ -221,15 +230,15 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public List<IdReferenceType> getRefPolicyRefs()
+		public IdReferenceType getApplicableRootPolicyRef()
 		{
-			return this.refPolicyRefs;
+			return this.applicableRootPolicyRef;
 		}
 
 		@Override
-		public List<String> getFeatureIDs()
+		public List<IdReferenceType> getApplicableRefPolicyRefs()
 		{
-			return this.featureIDs;
+			return this.applicableRefPolicyRefs;
 		}
 
 	}
@@ -1014,8 +1023,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				throw NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION;
 			}
 
-			final IdReferenceType newRootPolicyRef = properties.getRootPolicyRef();
-			if (newRootPolicyRef == null)
+			final IdReferenceType newRootPolicyRefExpression = properties.getRootPolicyRefExpression();
+			if (newRootPolicyRefExpression == null)
 			{
 				throw NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION;
 			}
@@ -1060,11 +1069,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				// If rootPolicyRef or requestFilter changed, validate/reload
 				// the PDP with new
 				// parameters
-				if (!newRootPolicyRef.equals(staticRefBasedRootPolicyProvider.getPolicyRef()) || !newRequestFilterId.equals(pdpConf.getRequestFilter()))
+				if (!newRootPolicyRefExpression.equals(staticRefBasedRootPolicyProvider.getPolicyRef()) || !newRequestFilterId.equals(pdpConf.getRequestFilter()))
 				{
 					lastPdpSyncedTime = pdpConfLastSyncTime;
 					pdpConf.setRequestFilter(newRequestFilterId);
-					staticRefBasedRootPolicyProvider.setPolicyRef(newRootPolicyRef);
+					staticRefBasedRootPolicyProvider.setPolicyRef(newRootPolicyRefExpression);
 					reloadPDP(pdpConf);
 				} else
 				{
@@ -1080,7 +1089,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				}
 
 				final List<IdReferenceType> activePolicyRefs = getPdpApplicablePolicyRefs();
-				return new ReadablePdpPropertiesImpl(properties.getFeatureIDs(), activePolicyRefs.get(0), activePolicyRefs.subList(1, activePolicyRefs.size()), lastPdpSyncedTime);
+				return new ReadablePdpPropertiesImpl(properties.getFeatureIDs(), newRootPolicyRefExpression, activePolicyRefs.get(0), activePolicyRefs.subList(1, activePolicyRefs.size()), lastPdpSyncedTime);
 			}
 		}
 
@@ -1133,7 +1142,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				}
 
 				final List<IdReferenceType> activePolicyRefs = getPdpApplicablePolicyRefs();
-				return new ReadablePdpPropertiesImpl(featureIDs, activePolicyRefs.get(0), activePolicyRefs.subList(1, activePolicyRefs.size()), lastPdpSyncedTime);
+				return new ReadablePdpPropertiesImpl(featureIDs,((StaticRefBasedRootPolicyProvider)rootPolicyProvider).getPolicyRef(), activePolicyRefs.get(0), activePolicyRefs.subList(1, activePolicyRefs.size()), lastPdpSyncedTime);
 			}
 		}
 
