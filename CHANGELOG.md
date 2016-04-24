@@ -1,6 +1,10 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
+## 5.0.0
+### Changed 
+- Implemented PAP DAO API (authzforce-ce-core-pap-api) version to 5.0.0
+
 ## 4.0.0
 ### Added
 - Option for policy version rolling (automatic removal of oldest versions if maximum allowed number of versions for a policy is reached)
