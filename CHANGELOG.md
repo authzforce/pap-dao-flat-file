@@ -1,7 +1,7 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
-## Unreleased
+## 5.0.0
 ### Changed 
 - Implemented PAP DAO API (authzforce-ce-core-pap-api) version to 5.0.0
 
