@@ -1,6 +1,10 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
+## Unreleased
+### Fixed
+- Version of dependency authzforce-ce-core upgraded to v3.8.2 fixing possible memory leak spotted by Tomcat because of using ThreadLocal that is never cleaned (SAXON 9.6 - StandardURIChecker/LRUCache)
+
 ## 5.0.0
 ### Changed 
 - Implemented PAP DAO API (authzforce-ce-core-pap-api) version to 5.0.0
