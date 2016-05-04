@@ -1,17 +1,20 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
-## Unreleased
+## 5.0.2
 ### Fixed
 - authzforce-ce-core dependency upgraded to v3.8.3 to fix hard arbitrary limitation on maxVarRefDepth and maxPolicyRefDepth attributes: removed any max value (used to be 100 for both).
+
 
 ## 5.0.1
 ### Fixed
 - Version of dependency authzforce-ce-core upgraded to v3.8.2 fixing possible memory leak spotted by Tomcat because of using ThreadLocal that is never cleaned (SAXON 9.6 - StandardURIChecker/LRUCache)
 
+
 ## 5.0.0
 ### Changed 
 - Implemented PAP DAO API (authzforce-ce-core-pap-api): v5.0.0
+
 
 ## 4.0.0
 ### Added
@@ -43,6 +46,7 @@ All notable changes to this project are documented in this file following the [K
 ## 3.6.1
 ### Fixed
 - Error handling when removing a policy and setting policy with invalid refs as root policy
+
 
 ## 3.6.0
 ### Added
