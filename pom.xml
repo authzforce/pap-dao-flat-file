@@ -6,7 +6,8 @@
 		<version>3.3.7</version>
 	</parent>
 	<artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
-	<version>5.0.3-SNAPSHOT</version>
+   <!-- Version must be >= authzforce-ce-core-pap-api dependency -->
+	<version>5.1.0-SNAPSHOT</version>
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>AuthZForce CE - PAP DAO implementation based on flat file database</description>
 	<url>https://tuleap.ow2.org/projects/authzforce</url>
@@ -34,12 +35,12 @@
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>${artifactId.prefix}-core-pap-api</artifactId>
-			<version>5.0.0</version>
+			<version>5.1.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>${artifactId.prefix}-core</artifactId>
-			<version>3.8.3</version>
+			<version>3.9.0-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 	<build>
