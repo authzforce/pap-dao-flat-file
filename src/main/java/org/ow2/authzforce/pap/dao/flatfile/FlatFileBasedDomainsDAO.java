@@ -49,9 +49,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
@@ -79,6 +81,7 @@ import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
 
 import org.ow2.authzforce.core.pap.api.dao.DomainDAOClient;
 import org.ow2.authzforce.core.pap.api.dao.DomainsDAO;
+import org.ow2.authzforce.core.pap.api.dao.PdpFeature;
 import org.ow2.authzforce.core.pap.api.dao.PolicyDAOClient;
 import org.ow2.authzforce.core.pap.api.dao.PolicyVersionDAOClient;
 import org.ow2.authzforce.core.pap.api.dao.PrpRWProperties;
@@ -87,15 +90,21 @@ import org.ow2.authzforce.core.pap.api.dao.ReadablePdpProperties;
 import org.ow2.authzforce.core.pap.api.dao.TooManyPoliciesException;
 import org.ow2.authzforce.core.pap.api.dao.WritableDomainProperties;
 import org.ow2.authzforce.core.pap.api.dao.WritablePdpProperties;
+import org.ow2.authzforce.core.pdp.api.DecisionResultFilter;
 import org.ow2.authzforce.core.pdp.api.EnvironmentPropertyName;
 import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils;
 import org.ow2.authzforce.core.pdp.api.PDP;
-import org.ow2.authzforce.core.pdp.api.PolicyVersion;
+import org.ow2.authzforce.core.pdp.api.PdpExtension;
+import org.ow2.authzforce.core.pdp.api.RequestFilter;
+import org.ow2.authzforce.core.pdp.api.combining.CombiningAlg;
+import org.ow2.authzforce.core.pdp.api.func.Function;
+import org.ow2.authzforce.core.pdp.api.func.FunctionSet;
+import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
+import org.ow2.authzforce.core.pdp.api.value.DatatypeFactory;
 import org.ow2.authzforce.core.pdp.impl.DefaultEnvironmentProperties;
-import org.ow2.authzforce.core.pdp.impl.DefaultRequestFilter;
-import org.ow2.authzforce.core.pdp.impl.MultiDecisionRequestFilter;
 import org.ow2.authzforce.core.pdp.impl.PDPImpl;
 import org.ow2.authzforce.core.pdp.impl.PdpConfigurationParser;
+import org.ow2.authzforce.core.pdp.impl.PdpExtensionLoader;
 import org.ow2.authzforce.core.pdp.impl.PdpModelHandler;
 import org.ow2.authzforce.core.pdp.impl.policy.StaticApplicablePolicyView;
 import org.ow2.authzforce.core.xmlns.pdp.Pdp;
@@ -210,21 +219,18 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	private static class ReadablePdpPropertiesImpl implements ReadablePdpProperties
 	{
 
-		private final List<String> featureIDs;
+		private final List<PdpFeature> features;
 		private final IdReferenceType rootPolicyRefExpression;
 		private final IdReferenceType applicableRootPolicyRef;
 		private final List<IdReferenceType> applicableRefPolicyRefs;
 		private final long lastModified;
 
-		private ReadablePdpPropertiesImpl(List<String> featureIDs, IdReferenceType rootPolicyRefExpression, IdReferenceType applicableRootPolicyRef, List<IdReferenceType> applicableRefPolicyRefs,
+		private ReadablePdpPropertiesImpl(List<PdpFeature> features, IdReferenceType rootPolicyRefExpression, IdReferenceType applicableRootPolicyRef, List<IdReferenceType> applicableRefPolicyRefs,
 				long lastModified)
 		{
-			assert rootPolicyRefExpression != null;
-			assert applicableRootPolicyRef != null;
-			assert applicableRefPolicyRefs != null;
-			assert featureIDs != null;
+			assert rootPolicyRefExpression != null && applicableRootPolicyRef != null && applicableRefPolicyRefs != null && features != null;
 
-			this.featureIDs = featureIDs;
+			this.features = features;
 			this.rootPolicyRefExpression = rootPolicyRefExpression;
 			this.applicableRootPolicyRef = applicableRootPolicyRef;
 			this.applicableRefPolicyRefs = applicableRefPolicyRefs;
@@ -232,9 +238,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public List<String> getFeatureIDs()
+		public List<PdpFeature> getFeatures()
 		{
-			return this.featureIDs;
+			return this.features;
 		}
 
 		@Override
@@ -281,25 +287,114 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	private static final IllegalArgumentException NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION = new IllegalArgumentException("Invalid domain PDP properties arg: rootPolicyRef undefined");
 	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null attributeProviders arg");
 
-	private static enum PdpFeature
+	/**
+	 * Supported PDP feature type
+	 */
+	public static enum PdpFeatureType
 	{
-		XACML_3_0_MULTIPLE_DECISION_PROFILE_REPEATED_ATTRIBUTE_CATEGORIES("urn:oasis:names:tc:xacml:3.0:profile:multiple:repeated-attribute-categories");
+
+		/**
+		 * Features that are not related to extensions like the ones below, but to Authzforce PDP's core engine. Considered as the default type, if undefined.
+		 */
+		CORE("urn:ow2:authzforce:feature-type:pdp:core", null),
+
+		/**
+		 * XACML Attribute DataType extension, corresponding to Authzforce PDP engine's configuration element <i>attributeDatatype</i>
+		 */
+		DATATYPE("urn:ow2:authzforce:feature-type:pdp:data-type", DatatypeFactory.class),
+
+		/**
+		 * XACML function extension, corresponding to Authzforce PDP engine's configuration element <i>function</i>
+		 */
+		FUNCTION("urn:ow2:authzforce:feature-type:pdp:function", Function.class),
+
+		/**
+		 * Set of XACML function extensions, corresponding to Authzforce PDP engine's configuration element <i>functionSet</i>
+		 */
+		FUNCTION_SET("urn:ow2:authzforce:feature-type:pdp:function-set", FunctionSet.class),
+
+		/**
+		 * Policy/Rule combining algorithm extension, corresponding to Authzforce PDP engine's configuration element <i>combiningAlgorithm</i>
+		 */
+		COMBINING_ALGORITHM("urn:ow2:authzforce:feature-type:pdp:combining-algorithm", CombiningAlg.class),
+
+		/**
+		 * XACML Request filter, corresponding to Authzforce PDP engine's configuration element <i>requestFilter</i>
+		 */
+		REQUEST_FILTER("urn:ow2:authzforce:feature-type:pdp:request-filter", RequestFilter.Factory.class),
+
+		/**
+		 * XACML Result filter, corresponding to Authzforce Core PDP engine's configuration element <i>resultFilter</i>
+		 */
+		RESULT_FILTER("urn:ow2:authzforce:feature-type:pdp:result-filter", DecisionResultFilter.class);
+
+		private final Class<? extends PdpExtension> extensionClass;
+		private final String id;
+
+		private PdpFeatureType(String id, Class<? extends PdpExtension> extensionClass)
+		{
+			this.id = id;
+			this.extensionClass = extensionClass;
+		}
+
+		private static PdpFeatureType fromId(String id)
+		{
+			for (final PdpFeatureType type : PdpFeatureType.values())
+			{
+				if (type.id.equals(id))
+				{
+					return type;
+				}
+			}
+
+			return null;
+		}
+
+		private static final Set<String> IDENTIFIERS;
+		static
+		{
+			final PdpFeatureType[] types = PdpFeatureType.values();
+			final Set<String> identifiers = new HashSet<>(types.length);
+			for (final PdpFeatureType type : types)
+			{
+				identifiers.add(type.id);
+			}
+
+			IDENTIFIERS = Collections.unmodifiableSet(identifiers);
+		}
+
+		@Override
+		public String toString()
+		{
+			return this.id;
+		}
+	}
+
+	/**
+	 * Supported PDP core feature
+	 */
+	public static enum PdpCoreFeature
+	{
+		/**
+		 * Corresponds to Authzforce PDP engine's configuration attribute <i>enableXPath</i>
+		 */
+		XPATH_EVAL("urn:ow2:authzforce:feature:pdp:core:xpath-eval"),
+
+		/**
+		 * Corresponds to Authzforce PDP engine's configuration attribute <i>strictAttributeIssuerMatch</i>
+		 */
+		STRICT_ATTRIBUTE_ISSUER_MATCH("urn:ow2:authzforce:feature:pdp:core:strict-attribute-issuer-match");
 
 		private final String id;
 
-		private PdpFeature(String id)
+		private PdpCoreFeature(String id)
 		{
 			this.id = id;
 		}
 
-		private String getId()
+		private static PdpCoreFeature fromId(String id)
 		{
-			return this.id;
-		}
-
-		private static PdpFeature fromId(String id)
-		{
-			for (final PdpFeature f : PdpFeature.values())
+			for (final PdpCoreFeature f : PdpCoreFeature.values())
 			{
 				if (f.id.equals(id))
 				{
@@ -309,6 +404,41 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 			return null;
 		}
+
+		@Override
+		public String toString()
+		{
+			return this.id;
+		}
+	}
+
+	private static final Map<PdpFeatureType, Set<String>> PDP_FEATURE_IDENTIFIERS_BY_TYPE = new EnumMap<>(PdpFeatureType.class);
+	private static final int PDP_FEATURE_COUNT;
+	static
+	{
+		// PDP core features
+		final PdpCoreFeature[] pdpCoreFeatures = PdpCoreFeature.values();
+		final Set<String> coreFeatureIDs = new HashSet<>(pdpCoreFeatures.length);
+		for (final PdpCoreFeature f : pdpCoreFeatures)
+		{
+			coreFeatureIDs.add(f.id);
+		}
+
+		PDP_FEATURE_IDENTIFIERS_BY_TYPE.put(PdpFeatureType.CORE, Collections.unmodifiableSet(coreFeatureIDs));
+		int featureCount = coreFeatureIDs.size();
+
+		// PDP extensions
+		for (final PdpFeatureType featureType : PdpFeatureType.values())
+		{
+			if (featureType.extensionClass != null)
+			{
+				final Set<String> extIDs = PdpExtensionLoader.getNonJaxbBoundExtensionIDs(featureType.extensionClass);
+				PDP_FEATURE_IDENTIFIERS_BY_TYPE.put(featureType, extIDs);
+				featureCount += extIDs.size();
+			}
+		}
+
+		PDP_FEATURE_COUNT = featureCount;
 	}
 
 	/**
@@ -372,6 +502,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 	};
+
+	private static final IllegalArgumentException INVALID_FEATURE_ID_EXCEPTION = new IllegalArgumentException("Invalid feature ID: undefined");
 
 	private final TimeBasedGenerator uuidGen;
 
@@ -456,7 +588,6 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 	private final class FileBasedDomainDAOImpl implements FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>
 	{
-
 		private final String domainId;
 
 		private final Path domainDirPath;
@@ -1041,6 +1172,85 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			return staticPolicyRefs;
 		}
 
+		private List<PdpFeature> getPdpFeatures(Pdp pdpConf)
+		{
+			final List<PdpFeature> features = new ArrayList<>(PDP_FEATURE_COUNT);
+			for (final PdpFeatureType featureType : PdpFeatureType.values())
+			{
+				final Set<String> enabledFeatures;
+				switch (featureType)
+				{
+				case CORE:
+					final PdpCoreFeature[] coreFeatures = PdpCoreFeature.values();
+					enabledFeatures = new HashSet<>(coreFeatures.length);
+					for (final PdpCoreFeature coreFeature : coreFeatures)
+					{
+						switch (coreFeature)
+						{
+						case XPATH_EVAL:
+							if (pdpConf.isEnableXPath())
+							{
+								enabledFeatures.add(coreFeature.id);
+							}
+							break;
+						case STRICT_ATTRIBUTE_ISSUER_MATCH:
+							if (pdpConf.isStrictAttributeIssuerMatch())
+							{
+								enabledFeatures.add(coreFeature.id);
+							}
+							break;
+						default:
+							throw new UnsupportedOperationException("Unsupported PDP CORE feature: " + coreFeature.id);
+						}
+					}
+
+					break;
+
+				case DATATYPE:
+					enabledFeatures = new HashSet<>(pdpConf.getAttributeDatatypes());
+					break;
+
+				case FUNCTION:
+					enabledFeatures = new HashSet<>(pdpConf.getFunctions());
+					break;
+
+				case FUNCTION_SET:
+					enabledFeatures = new HashSet<>(pdpConf.getFunctionSets());
+					break;
+
+				case COMBINING_ALGORITHM:
+					enabledFeatures = new HashSet<>(pdpConf.getCombiningAlgorithms());
+					break;
+
+				case REQUEST_FILTER:
+					enabledFeatures = Collections.singleton(pdpConf.getRequestFilter());
+					break;
+
+				case RESULT_FILTER:
+					final String resultFilter = pdpConf.getResultFilter();
+					enabledFeatures = resultFilter == null ? Collections.<String> emptySet() : Collections.<String> singleton(resultFilter);
+					break;
+
+				default:
+					throw new UnsupportedOperationException("Unsupported PDP feature type: " + featureType);
+				}
+
+				final Set<String> disabledFeatures = new HashSet<>(PDP_FEATURE_IDENTIFIERS_BY_TYPE.get(featureType));
+				for (final String featureId : enabledFeatures)
+				{
+					features.add(new PdpFeature(featureId, featureType.id, true));
+					disabledFeatures.remove(featureId);
+				}
+
+				for (final String disabledFeatureID : disabledFeatures)
+				{
+					features.add(new PdpFeature(disabledFeatureID, featureType.id, false));
+				}
+			} // END Collect PDP features
+
+			return features;
+		}
+
 		@Override
 		public ReadablePdpProperties setOtherPdpProperties(WritablePdpProperties properties) throws IOException, IllegalArgumentException
 		{
@@ -1061,26 +1271,6 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				// Get current PDP conf that we have to change (only part of it)
 				final Pdp pdpConf = loadPDPConfTmpl();
 
-				String newRequestFilterId = DefaultRequestFilter.LaxFilterFactory.ID;
-				for (final String featureID : properties.getFeatureIDs())
-				{
-					final PdpFeature feature = PdpFeature.fromId(featureID);
-					if (feature == null)
-					{
-						throw new IllegalArgumentException("Unsupported feature: " + featureID);
-					}
-
-					switch (feature)
-					{
-					case XACML_3_0_MULTIPLE_DECISION_PROFILE_REPEATED_ATTRIBUTE_CATEGORIES:
-						newRequestFilterId = MultiDecisionRequestFilter.LaxFilterFactory.ID;
-						break;
-					default:
-						break;
-
-					}
-				}
-
 				/*
 				 * First check whether rootPolicyRef is the same/unchanged to avoid useless PDP reload (loading a new PDP is costly)
 				 */
@@ -1092,32 +1282,136 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 							+ " as expected.");
 				}
 
+				// let's change the PDP configuration
+				lastPdpSyncedTime = pdpConfLastSyncTime;
 				final StaticRefBasedRootPolicyProvider staticRefBasedRootPolicyProvider = (StaticRefBasedRootPolicyProvider) rootPolicyProvider;
-				// If rootPolicyRef or requestFilter changed, validate/reload
-				// the PDP with new
-				// parameters
-				if (!newRootPolicyRefExpression.equals(staticRefBasedRootPolicyProvider.getPolicyRef()) || !newRequestFilterId.equals(pdpConf.getRequestFilter()))
-				{
-					lastPdpSyncedTime = pdpConfLastSyncTime;
-					pdpConf.setRequestFilter(newRequestFilterId);
-					staticRefBasedRootPolicyProvider.setPolicyRef(newRootPolicyRefExpression);
-					reloadPDP(pdpConf);
-				} else
-				{
-					// Sync policies to make sure
-					// pdp.getStaticApplicablePolicies() is up-to-date
-					final boolean isPdpReloaded = syncPdpPolicies();
-					// If no PDP reload occurred take pdpConfLastSyncTime as
-					// lastPdpSyncedTime
-					if (!isPdpReloaded)
-					{
-						lastPdpSyncedTime = pdpConfLastSyncTime;
-					}
-				}
 
+				// PDP features
+				// reset features
+				pdpConf.setEnableXPath(false);
+				pdpConf.setStrictAttributeIssuerMatch(false);
+				pdpConf.setRequestFilter(null);
+				// requestFilter has a default value if input undefined
+				final String defaultRequestFilter = pdpConf.getRequestFilter();
+				pdpConf.setResultFilter(null);
+				pdpConf.getAttributeDatatypes().clear();
+				pdpConf.getCombiningAlgorithms().clear();
+				pdpConf.getFunctions().clear();
+				pdpConf.getFunctionSets().clear();
+
+				// BEGIN COLLECT INPUT FEATURES
+				// validate/canonicalize input PDP features, making sure all extensions are listed only once per ID, with a defined type and enabled=true/false
+				final Set<String> featureIDs = new HashSet<>(PDP_FEATURE_COUNT);
+				for (final PdpFeature feature : properties.getFeatures())
+				{
+					final String featureID = feature.getID();
+					if (featureID == null)
+					{
+						throw INVALID_FEATURE_ID_EXCEPTION;
+					}
+
+					final String inputFeatureTypeId = feature.getType();
+					final PdpFeatureType nonNullFeatureType;
+					if (inputFeatureTypeId == null)
+					{
+						nonNullFeatureType = PdpFeatureType.CORE;
+					} else
+					{
+						nonNullFeatureType = PdpFeatureType.fromId(inputFeatureTypeId);
+						if (nonNullFeatureType == null)
+						{
+							throw new IllegalArgumentException("Invalid feature type: '" + inputFeatureTypeId + "'. Expected: " + PdpFeatureType.IDENTIFIERS);
+						}
+					}
+
+					// CORE is the default feature type if type undefined
+
+					final Set<String> validFeatureIDs = PDP_FEATURE_IDENTIFIERS_BY_TYPE.get(nonNullFeatureType);
+					if (!validFeatureIDs.contains(featureID))
+					{
+						throw new IllegalArgumentException("Invalid " + nonNullFeatureType + " feature: '" + featureID + "'. Expected: " + validFeatureIDs);
+					}
+
+					if (!featureIDs.add(featureID))
+					{
+						throw new IllegalArgumentException("Duplicate feature: " + featureID);
+					}
+
+					// if feature not enabled, skip it since by default, all features are disabled (request filter "disabled" means here that it it is set to default value)
+					if (!feature.isEnabled())
+					{
+						continue;
+					}
+
+					switch (nonNullFeatureType)
+					{
+					case CORE:
+						final PdpCoreFeature coreFeature = PdpCoreFeature.fromId(featureID);
+						switch (coreFeature)
+						{
+						case XPATH_EVAL:
+							pdpConf.setEnableXPath(true);
+							break;
+						case STRICT_ATTRIBUTE_ISSUER_MATCH:
+							pdpConf.setStrictAttributeIssuerMatch(true);
+							break;
+						default:
+							throw new UnsupportedOperationException("Unsupported " + nonNullFeatureType + " feature: '" + featureID + "'. Expected: " + validFeatureIDs);
+						}
+
+						break;
+
+					case DATATYPE:
+						pdpConf.getAttributeDatatypes().add(featureID);
+						break;
+
+					case FUNCTION:
+						pdpConf.getFunctions().add(featureID);
+						break;
+
+					case FUNCTION_SET:
+						pdpConf.getFunctionSets().add(featureID);
+						break;
+
+					case COMBINING_ALGORITHM:
+						pdpConf.getCombiningAlgorithms().add(featureID);
+						break;
+
+					case REQUEST_FILTER:
+						/*
+						 * If current is different from default, it means it is already set, in which case we raise an error because only one such feature may be set at at time
+						 */
+						if (!pdpConf.getRequestFilter().equals(defaultRequestFilter))
+						{
+							throw new IllegalArgumentException("More than one " + nonNullFeatureType + " feature enabled. Only one feature of this type may be enabled at a time.");
+						}
+
+						pdpConf.setRequestFilter(featureID);
+						break;
+
+					case RESULT_FILTER:
+						/*
+						 * If already set, we raise an error because at most one such feature may be set a time
+						 */
+						if (pdpConf.getResultFilter() != null)
+						{
+							throw new IllegalArgumentException("More than one " + nonNullFeatureType + " feature enabled. Only one feature of this type may be enabled at a time.");
+						}
+
+						pdpConf.setResultFilter(featureID);
+						break;
+
+					default:
+						throw new UnsupportedOperationException("Unsupported PDP feature type: '" + nonNullFeatureType.id + "'. Expected: " + PdpFeatureType.IDENTIFIERS);
+					}
+				} // END COLLECT INPUT FEATURES
+
+				staticRefBasedRootPolicyProvider.setPolicyRef(newRootPolicyRefExpression);
+				reloadPDP(pdpConf);
+
+				final List<PdpFeature> pdpFeatures = getPdpFeatures(pdpConf);
 				final List<IdReferenceType> activePolicyRefs = getPdpApplicablePolicyRefs();
-				return new ReadablePdpPropertiesImpl(properties.getFeatureIDs(), newRootPolicyRefExpression, activePolicyRefs.get(0), activePolicyRefs.subList(1, activePolicyRefs.size()),
-						lastPdpSyncedTime);
+				return new ReadablePdpPropertiesImpl(pdpFeatures, newRootPolicyRefExpression, activePolicyRefs.get(0), activePolicyRefs.subList(1, activePolicyRefs.size()), lastPdpSyncedTime);
 			}
 		}
 
@@ -1165,15 +1459,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					}
 				}
 
-				final List<String> featureIDs = new ArrayList<>();
-				final String pdpReqFilterId = pdpConf.getRequestFilter();
-				if (MultiDecisionRequestFilter.LaxFilterFactory.ID.equals(pdpReqFilterId) || MultiDecisionRequestFilter.StrictFilterFactory.ID.equals(pdpReqFilterId))
-				{
-					featureIDs.add(PdpFeature.XACML_3_0_MULTIPLE_DECISION_PROFILE_REPEATED_ATTRIBUTE_CATEGORIES.getId());
-				}
-
+				// Collect PDP features
+				final List<PdpFeature> features = getPdpFeatures(pdpConf);
 				final List<IdReferenceType> activePolicyRefs = getPdpApplicablePolicyRefs();
-				return new ReadablePdpPropertiesImpl(featureIDs, ((StaticRefBasedRootPolicyProvider) rootPolicyProvider).getPolicyRef(), activePolicyRefs.get(0), activePolicyRefs.subList(1,
+				return new ReadablePdpPropertiesImpl(features, ((StaticRefBasedRootPolicyProvider) rootPolicyProvider).getPolicyRef(), activePolicyRefs.get(0), activePolicyRefs.subList(1,
 						activePolicyRefs.size()), lastPdpSyncedTime);
 			}
 		}
