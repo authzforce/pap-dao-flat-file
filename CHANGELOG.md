@@ -1,6 +1,12 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
+
+## Unreleased
+### Added
+- Support for authzforce-ce-core-pap-api v5.1.0: Management of PDP features (extensions), i.e. listing, get status, activation/de-activation: custom XACML datatypes, custom functions, custom policy/rule combining algorithms, custom XACML Request filter, custom XACML Result filter.
+
+
 ## 5.0.2
 ### Fixed
 - authzforce-ce-core dependency upgraded to v3.8.3 to fix hard arbitrary limitation on maxVarRefDepth and maxPolicyRefDepth attributes: removed any max value (used to be 100 for both).
