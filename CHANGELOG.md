@@ -1,7 +1,7 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
-## Unreleased
+## 6.0.0
 ### Changed
 - Dependency authzforce-ce-core version to 4.0.0, resulting in changes of IDs of features of type `urn:ow2:authzforce:feature-type:pdp:request-filter`:
 	- `urn:ow2:authzforce:xacml:request-filter:default-lax` changed to `urn:ow2:authzforce:feature:pdp:request-filter:default-lax`;
@@ -12,6 +12,7 @@ All notable changes to this project are documented in this file following the [K
 
 ### Fixed
 - License headers (current year)
+
 
 ## 5.1.0
 ### Added
