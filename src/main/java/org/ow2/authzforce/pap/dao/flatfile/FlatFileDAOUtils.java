@@ -44,6 +44,8 @@ public final class FlatFileDAOUtils
 	// java.util.Base64.getURLEncoder() when moving to Java 8
 	private static final BaseEncoding BASE64URL_NO_PADDING_ENCODING = BaseEncoding.base64Url().omitPadding();
 
+	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null file arg");
+
 	/**
 	 * Encode bytes with base64url specified by RFC 4648, without padding
 	 * 
@@ -57,8 +59,7 @@ public final class FlatFileDAOUtils
 	}
 
 	/**
-	 * Encode string with base64url specified by RFC 4648, without padding. Used to create filenames compatible with
-	 * most filesystems
+	 * Encode string with base64url specified by RFC 4648, without padding. Used to create filenames compatible with most filesystems
 	 * 
 	 * @param input
 	 *            input
@@ -83,9 +84,6 @@ public final class FlatFileDAOUtils
 		return new String(BASE64URL_NO_PADDING_ENCODING.decode(encoded), StandardCharsets.UTF_8);
 	}
 
-	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException(
-			"Null file arg");
-
 	private FlatFileDAOUtils()
 	{
 	}
@@ -102,11 +100,9 @@ public final class FlatFileDAOUtils
 	 * @param canwrite
 	 *            true if and only if file is expected to be writable
 	 * @throws IllegalArgumentException
-	 *             if
-	 *             {@code file == null || !file.exists() || !file.canRead() || (isdirectory && !file.isDirectory()) || (!isdirectory && file.isDirectory()) || (canwrite && !file.canWrite())}
+	 *             if {@code file == null || !file.exists() || !file.canRead() || (isdirectory && !file.isDirectory()) || (!isdirectory && file.isDirectory()) || (canwrite && !file.canWrite())}
 	 */
-	public static void checkFile(String friendlyname, Path file, boolean isdirectory, boolean canwrite)
-			throws IllegalArgumentException
+	public static void checkFile(String friendlyname, Path file, boolean isdirectory, boolean canwrite) throws IllegalArgumentException
 	{
 		if (file == null)
 		{
@@ -158,8 +154,7 @@ public final class FlatFileDAOUtils
 		@Override
 		public boolean accept(Path entry) throws IOException
 		{
-			final boolean isAccepted = Files.isRegularFile(entry) && Files.isReadable(entry)
-					&& pathSuffixMatcher.matches(entry.getFileName());
+			final boolean isAccepted = Files.isRegularFile(entry) && Files.isReadable(entry) && pathSuffixMatcher.matches(entry.getFileName());
 			return isAccepted;
 		}
 	}
@@ -231,39 +226,33 @@ public final class FlatFileDAOUtils
 	/**
 	 * Copy a directory recursively to another (does not follow links)
 	 * 
-	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not
-	 * the case so far.
+	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not the case so far.
 	 * 
 	 * @param source
 	 *            source directory
 	 * @param target
 	 *            target directory
 	 * @param maxDepth
-	 *            maximum number of levels of directories to copy. A value of 0 means that only the starting directory
-	 *            is visited.
+	 *            maximum number of levels of directories to copy. A value of 0 means that only the starting directory is visited.
 	 * @throws IllegalArgumentException
 	 *             if the maxDepth parameter is negative
 	 * @throws IOException
 	 *             file copy error
 	 */
-	public static void copyDirectory(Path source, Path target, int maxDepth) throws IOException,
-			IllegalArgumentException
+	public static void copyDirectory(Path source, Path target, int maxDepth) throws IOException, IllegalArgumentException
 	{
-		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(), maxDepth, new CopyingFileVisitor(source,
-				target));
+		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(), maxDepth, new CopyingFileVisitor(source, target));
 	}
 
 	/**
 	 * Delete a directory recursively
 	 * 
-	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not
-	 * the case so far.
+	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not the case so far.
 	 * 
 	 * @param dir
 	 *            directory
 	 * @param maxDepth
-	 *            maximum number of levels of directories to delete. A value of 0 means that only the starting file is
-	 *            visited.
+	 *            maximum number of levels of directories to delete. A value of 0 means that only the starting file is visited.
 	 * @throws IllegalArgumentException
 	 *             if the maxDepth parameter is negative
 	 * @throws IOException

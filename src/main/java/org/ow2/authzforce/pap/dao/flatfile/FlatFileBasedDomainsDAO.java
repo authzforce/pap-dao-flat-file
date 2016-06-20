@@ -146,6 +146,89 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(FlatFileBasedDomainsDAO.class);
 
+	private static final IllegalArgumentException ILLEGAL_CONSTRUCTOR_ARGS_EXCEPTION = new IllegalArgumentException(
+			"One of the following FileBasedDomainsDAO constructor arguments is undefined although required: domainsRoot == null || domainTmpl == null || schema == null || pdpModelHandler == null || domainDAOClientFactory == null || policyDAOClientFactory == null");
+
+	private static final IllegalArgumentException NULL_DOMAIN_ID_ARG_EXCEPTION = new IllegalArgumentException("Undefined domain ID arg");
+
+	private static final IllegalArgumentException ILLEGAL_POLICY_NOT_STATIC_EXCEPTION = new IllegalArgumentException(
+			"One of the policy finders in the domain PDP configuration is not static, or one of the policies required by PDP cannot be statically resolved");
+
+	private static final RuntimeException NON_STATIC_POLICY_EXCEPTION = new RuntimeException("Unexpected error: Some policies are not statically resolved (pdp.getStaticApplicablePolicies() == null)");
+
+	private static final IllegalArgumentException NULL_POLICY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null policySet arg");
+	private static final IllegalArgumentException NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain properties arg");
+	private static final IllegalArgumentException NULL_PRP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain PRP properties arg");
+	private static final IllegalArgumentException NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain PDP properties arg");
+	private static final IllegalArgumentException NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION = new IllegalArgumentException("Invalid domain PDP properties arg: rootPolicyRef undefined");
+	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null attributeProviders arg");
+
+	private static final TreeSet<PolicyVersion> EMPTY_TREE_SET = new TreeSet<>();
+
+	/**
+	 * Domain properties XSD location
+	 */
+	public static final String DOMAIN_PROPERTIES_XSD_LOCATION = "classpath:org.ow2.authzforce.pap.dao.flatfile.properties.xsd";
+
+	/**
+	 * Name of domain properties file
+	 */
+	public static final String DOMAIN_PROPERTIES_FILENAME = "properties.xml";
+
+	/**
+	 * Name of PDP configuration file
+	 */
+	public static final String DOMAIN_PDP_CONFIG_FILENAME = "pdp.xml";
+
+	private static final JAXBContext DOMAIN_PROPERTIES_JAXB_CONTEXT;
+
+	static
+	{
+		try
+		{
+			DOMAIN_PROPERTIES_JAXB_CONTEXT = JAXBContext.newInstance(DomainProperties.class);
+		} catch (JAXBException e)
+		{
+			throw new RuntimeException("Error creating JAXB context for (un)marshalling domain properties (XML)", e);
+		}
+	}
+
+	private static final Schema DOMAIN_PROPERTIES_SCHEMA;
+
+	static
+	{
+		final SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+		try
+		{
+			DOMAIN_PROPERTIES_SCHEMA = schemaFactory.newSchema(ResourceUtils.getURL(DOMAIN_PROPERTIES_XSD_LOCATION));
+		} catch (FileNotFoundException e)
+		{
+			throw new RuntimeException("Domain properties schema not found", e);
+		} catch (SAXException e)
+		{
+			throw new RuntimeException("Invalid domain properties schema file", e);
+		}
+	}
+
+	private static final DateFormat UTC_DATE_WITH_MILLIS_FORMATTER = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS ('UTC')");
+	static
+	{
+		UTC_DATE_WITH_MILLIS_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
+	}
+
+	private static final DirectoryStream.Filter<Path> DIRECTORY_FILTER = new DirectoryStream.Filter<Path>()
+	{
+
+		@Override
+		public boolean accept(Path path)
+		{
+			return Files.isDirectory(path);
+		}
+
+	};
+
+	private static final IllegalArgumentException INVALID_FEATURE_ID_EXCEPTION = new IllegalArgumentException("Invalid feature ID: undefined");
+
 	private static class ReadableDomainPropertiesImpl implements ReadableDomainProperties
 	{
 
@@ -268,24 +351,6 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 	}
-
-	private static final IllegalArgumentException ILLEGAL_CONSTRUCTOR_ARGS_EXCEPTION = new IllegalArgumentException(
-			"One of the following FileBasedDomainsDAO constructor arguments is undefined although required: domainsRoot == null || domainTmpl == null || schema == null || pdpModelHandler == null || domainDAOClientFactory == null || policyDAOClientFactory == null");
-
-	private static final IllegalArgumentException NULL_DOMAIN_ID_ARG_EXCEPTION = new IllegalArgumentException("Undefined domain ID arg");
-
-	private static final IllegalArgumentException ILLEGAL_POLICY_NOT_STATIC_EXCEPTION = new IllegalArgumentException(
-			"One of the policy finders in the domain PDP configuration is not static, or one of the policies required by PDP cannot be statically resolved");
-
-	private static final RuntimeException NON_STATIC_POLICY_EXCEPTION = new RuntimeException("Unexpected error: Some policies are not statically resolved (pdp.getStaticApplicablePolicies() == null)");
-
-	private static final IllegalArgumentException NULL_POLICY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null policySet arg");
-	private static final TreeSet<PolicyVersion> EMPTY_TREE_SET = new TreeSet<>();
-	private static final IllegalArgumentException NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain properties arg");
-	private static final IllegalArgumentException NULL_PRP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain PRP properties arg");
-	private static final IllegalArgumentException NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain PDP properties arg");
-	private static final IllegalArgumentException NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION = new IllegalArgumentException("Invalid domain PDP properties arg: rootPolicyRef undefined");
-	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null attributeProviders arg");
 
 	/**
 	 * Supported PDP feature type
@@ -442,72 +507,6 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	}
 
 	/**
-	 * Domain properties XSD location
-	 */
-	public static final String DOMAIN_PROPERTIES_XSD_LOCATION = "classpath:org.ow2.authzforce.pap.dao.flatfile.properties.xsd";
-
-	/**
-	 * Name of domain properties file
-	 */
-	public static final String DOMAIN_PROPERTIES_FILENAME = "properties.xml";
-
-	/**
-	 * Name of PDP configuration file
-	 */
-	public static final String DOMAIN_PDP_CONFIG_FILENAME = "pdp.xml";
-
-	private static final JAXBContext DOMAIN_PROPERTIES_JAXB_CONTEXT;
-
-	static
-	{
-		try
-		{
-			DOMAIN_PROPERTIES_JAXB_CONTEXT = JAXBContext.newInstance(DomainProperties.class);
-		} catch (JAXBException e)
-		{
-			throw new RuntimeException("Error creating JAXB context for (un)marshalling domain properties (XML)", e);
-		}
-	}
-
-	private static final Schema DOMAIN_PROPERTIES_SCHEMA;
-
-	static
-	{
-		final SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-		try
-		{
-			DOMAIN_PROPERTIES_SCHEMA = schemaFactory.newSchema(ResourceUtils.getURL(DOMAIN_PROPERTIES_XSD_LOCATION));
-		} catch (FileNotFoundException e)
-		{
-			throw new RuntimeException("Domain properties schema not found", e);
-		} catch (SAXException e)
-		{
-			throw new RuntimeException("Invalid domain properties schema file", e);
-		}
-	}
-
-	private static final DateFormat UTC_DATE_WITH_MILLIS_FORMATTER = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS ('UTC')");
-	static
-	{
-		UTC_DATE_WITH_MILLIS_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
-	}
-
-	private static final DirectoryStream.Filter<Path> DIRECTORY_FILTER = new DirectoryStream.Filter<Path>()
-	{
-
-		@Override
-		public boolean accept(Path path)
-		{
-			return Files.isDirectory(path);
-		}
-
-	};
-
-	private static final IllegalArgumentException INVALID_FEATURE_ID_EXCEPTION = new IllegalArgumentException("Invalid feature ID: undefined");
-
-	private final TimeBasedGenerator uuidGen;
-
-	/**
 	 * Initializes a UUID generator that generates UUID version 1. It is thread-safe and uses the host MAC address as the node field if useRandomAddressBasedUUID = false, in which case UUID uniqueness
 	 * across multiple hosts (e.g. in a High-Availability architecture) is guaranteed. If this is used by multiple hosts to generate UUID for common objects (e.g. in a High Availability architecture),
 	 * it is critical that clocks of all hosts be synchronized (e.g. with a common NTP server). If no MAC address is available, e.g. no network connection, set useRandomAddressBasedUUID = true to use
@@ -537,6 +536,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 		return Generators.timeBasedGenerator(macAddress);
 	}
+
+	private final TimeBasedGenerator uuidGen;
 
 	private final Path domainsRootDir;
 
