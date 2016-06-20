@@ -71,6 +71,8 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 
 	private static final IllegalArgumentException NULL_XML_CONF_ARGUMENT_EXCEPTION = new IllegalArgumentException("XML/JAXB configuration argument undefined");
 
+	private static final IllegalArgumentException UNSUPPORTED_POLICY_REFERENCE_EXCEPTION = new IllegalArgumentException("PolicyIdReferences not supported");
+
 	/**
 	 * Validate provider config and returns policy parent directory and policy (version-specific) filename suffix
 	 * 
@@ -153,8 +155,6 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 		}
 
 	}
-
-	private static final IllegalArgumentException UNSUPPORTED_POLICY_REFERENCE_EXCEPTION = new IllegalArgumentException("PolicyIdReferences not supported");
 
 	private final Path policyParentDirectory;
 	private final DirectoryStream.Filter<? super Path> dirStreamFilter;
