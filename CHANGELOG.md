@@ -1,6 +1,11 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
+## 6.0.1
+### Fixed
+- Issues reported by Codacy (including fixes in dependencies: core-pap-api 5.2.1, core 4.2.0)
+
+
 ## 6.0.0
 ### Changed
 - Dependency authzforce-ce-core version to 4.0.0, resulting in changes of IDs of features of type `urn:ow2:authzforce:feature-type:pdp:request-filter`:
