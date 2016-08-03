@@ -40,6 +40,7 @@ import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
 import org.ow2.authzforce.core.pdp.api.EnvironmentProperties;
 import org.ow2.authzforce.core.pdp.api.EvaluationContext;
 import org.ow2.authzforce.core.pdp.api.IndeterminateEvaluationException;
+import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils;
 import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils.XACMLParserFactory;
 import org.ow2.authzforce.core.pdp.api.StatusHelper;
 import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
@@ -59,50 +60,60 @@ import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDAORefPolicyProvi
 import org.springframework.util.ResourceUtils;
 
 /**
- * Static Ref Policy Provider for the File-based PAP DAO. This provider expects to find a XACML PolicySet file at PARENT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX. PolicySetId and Version
- * are the respective XACML attributes of the PolicySet. PARENT_DIRECTORY is the parent directory where all policies are located, one directory per each policy (one sub-file per policy version), as
- * defined by the 'policyLocation' attribute.
+ * Static Ref Policy Provider for the File-based PAP DAO. This provider expects
+ * to find a XACML PolicySet file at
+ * PARENT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX. PolicySetId and
+ * Version are the respective XACML attributes of the PolicySet.
+ * PARENT_DIRECTORY is the parent directory where all policies are located, one
+ * directory per each policy (one sub-file per policy version), as defined by
+ * the 'policyLocation' attribute.
  * <p>
- * 'base64url' function refers to Base64url encoding specified by RFC 4648, without padding.
+ * 'base64url' function refers to Base64url encoding specified by RFC 4648,
+ * without padding.
  */
-public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicyProviderModule
-{
-	private static final IllegalArgumentException NULL_POLICY_LOCATION_PATTERN_ARGUMENT_EXCEPTION = new IllegalArgumentException("policyLocationPattern argument undefined");
+public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicyProviderModule {
+	private static final IllegalArgumentException NULL_POLICY_LOCATION_PATTERN_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"policyLocationPattern argument undefined");
 
-	private static final IllegalArgumentException NULL_XML_CONF_ARGUMENT_EXCEPTION = new IllegalArgumentException("XML/JAXB configuration argument undefined");
+	private static final IllegalArgumentException NULL_XML_CONF_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"XML/JAXB configuration argument undefined");
 
-	private static final IllegalArgumentException UNSUPPORTED_POLICY_REFERENCE_EXCEPTION = new IllegalArgumentException("PolicyIdReferences not supported");
+	private static final IllegalArgumentException UNSUPPORTED_POLICY_REFERENCE_EXCEPTION = new IllegalArgumentException(
+			"PolicyIdReferences not supported");
 
 	/**
-	 * Validate provider config and returns policy parent directory and policy (version-specific) filename suffix
+	 * Validate provider config and returns policy parent directory and policy
+	 * (version-specific) filename suffix
 	 * 
 	 * @param policyLocationPattern
-	 *            policy location pattern, expected to be PARENT_DIRECTORY/*SUFFIX, where PARENT_DIRECTORY is a valid directory path where the policies should be located.
-	 * @return entry where the key is the parent directory to all policies, and the value is the policy filename suffix for each policy version
+	 *            policy location pattern, expected to be
+	 *            PARENT_DIRECTORY/*SUFFIX, where PARENT_DIRECTORY is a valid
+	 *            directory path where the policies should be located.
+	 * @return entry where the key is the parent directory to all policies, and
+	 *         the value is the policy filename suffix for each policy version
 	 * @throws IllegalArgumentException
 	 *             if the policyLocationPattern is invalid
 	 */
-	public static Entry<Path, String> validateConf(String policyLocationPattern) throws IllegalArgumentException
-	{
-		if (policyLocationPattern == null)
-		{
+	public static Entry<Path, String> validateConf(String policyLocationPattern) throws IllegalArgumentException {
+		if (policyLocationPattern == null) {
 			throw NULL_POLICY_LOCATION_PATTERN_ARGUMENT_EXCEPTION;
 		}
 
 		final int index = policyLocationPattern.indexOf("/*");
-		if (index == -1)
-		{
-			throw new IllegalArgumentException("Invalid policyLocationPattern in refPolicyProvider configuration: " + policyLocationPattern + ": '/*' not found");
+		if (index == -1) {
+			throw new IllegalArgumentException("Invalid policyLocationPattern in refPolicyProvider configuration: "
+					+ policyLocationPattern + ": '/*' not found");
 		}
 
 		final String prefix = policyLocationPattern.substring(0, index);
 		final Path policyParentDirectory;
-		try
-		{
+		try {
 			policyParentDirectory = ResourceUtils.getFile(prefix).toPath();
-		} catch (FileNotFoundException e)
-		{
-			throw new IllegalArgumentException("Invalid policy directory path in refPolicyProvider/policyLocationPattern (prefix before '/*'): " + policyLocationPattern, e);
+		} catch (FileNotFoundException e) {
+			throw new IllegalArgumentException(
+					"Invalid policy directory path in refPolicyProvider/policyLocationPattern (prefix before '/*'): "
+							+ policyLocationPattern,
+					e);
 		}
 
 		final String suffix = policyLocationPattern.substring(index + 2);
@@ -113,44 +124,44 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 	 * Module factory
 	 *
 	 */
-	public static class Factory extends RefPolicyProviderModule.Factory<StaticFlatFileDAORefPolicyProvider>
-	{
-		private static final IllegalArgumentException ILLEGAL_COMBINING_ALG_REGISTRY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Undefined CombiningAlgorithm registry");
-		private static final IllegalArgumentException ILLEGAL_EXPRESSION_FACTORY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Undefined Expression factory");
-		private static final IllegalArgumentException ILLEGAL_XACML_PARSER_FACTORY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Undefined XACML parser factory");
+	public static class Factory extends RefPolicyProviderModule.Factory<StaticFlatFileDAORefPolicyProvider> {
+		private static final IllegalArgumentException ILLEGAL_COMBINING_ALG_REGISTRY_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+				"Undefined CombiningAlgorithm registry");
+		private static final IllegalArgumentException ILLEGAL_EXPRESSION_FACTORY_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+				"Undefined Expression factory");
+		private static final IllegalArgumentException ILLEGAL_XACML_PARSER_FACTORY_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+				"Undefined XACML parser factory");
 
 		@Override
-		public RefPolicyProviderModule getInstance(StaticFlatFileDAORefPolicyProvider conf, XACMLParserFactory xacmlParserFactory, int maxPolicySetRefDepth, ExpressionFactory expressionFactory,
-				CombiningAlgRegistry combiningAlgRegistry, EnvironmentProperties environmentProperties) throws IllegalArgumentException
-		{
-			if (conf == null)
-			{
+		public RefPolicyProviderModule getInstance(StaticFlatFileDAORefPolicyProvider conf,
+				XACMLParserFactory xacmlParserFactory, int maxPolicySetRefDepth, ExpressionFactory expressionFactory,
+				CombiningAlgRegistry combiningAlgRegistry, EnvironmentProperties environmentProperties)
+						throws IllegalArgumentException {
+			if (conf == null) {
 				throw NULL_XML_CONF_ARGUMENT_EXCEPTION;
 			}
 
-			if (xacmlParserFactory == null)
-			{
+			if (xacmlParserFactory == null) {
 				throw ILLEGAL_XACML_PARSER_FACTORY_ARGUMENT_EXCEPTION;
 			}
 
-			if (expressionFactory == null)
-			{
+			if (expressionFactory == null) {
 				throw ILLEGAL_EXPRESSION_FACTORY_ARGUMENT_EXCEPTION;
 			}
 
-			if (combiningAlgRegistry == null)
-			{
+			if (combiningAlgRegistry == null) {
 				throw ILLEGAL_COMBINING_ALG_REGISTRY_ARGUMENT_EXCEPTION;
 			}
 
-			final String policyLocationPattern = environmentProperties.replacePlaceholders(conf.getPolicyLocationPattern());
+			final String policyLocationPattern = environmentProperties
+					.replacePlaceholders(conf.getPolicyLocationPattern());
 			final Entry<Path, String> result = validateConf(policyLocationPattern);
-			return new FlatFileDAORefPolicyProviderModule(result.getKey(), result.getValue(), xacmlParserFactory, expressionFactory, combiningAlgRegistry, maxPolicySetRefDepth);
+			return new FlatFileDAORefPolicyProviderModule(result.getKey(), result.getValue(), xacmlParserFactory,
+					expressionFactory, combiningAlgRegistry, maxPolicySetRefDepth);
 		}
 
 		@Override
-		public Class<StaticFlatFileDAORefPolicyProvider> getJaxbClass()
-		{
+		public Class<StaticFlatFileDAORefPolicyProvider> getJaxbClass() {
 			return StaticFlatFileDAORefPolicyProvider.class;
 		}
 
@@ -163,59 +174,71 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 	private final CombiningAlgRegistry combiningAlgRegistry;
 	private final int maxPolicyRefDepth;
 
-	private class PolicyProxy
-	{
+	/**
+	 * Lazy initializer (from file) of PolicyEvaluators (for XACML PolicySets
+	 * only). Since the instantiation of a PolicyEvaluator from a file is
+	 * costly, this provides a convenient way to instantiate one only when the
+	 * PolicySetId/Version is actually needed, i.e. referenced from other
+	 * policies instantiated/evaluated by the PDP. It allows to have access to
+	 * the intermediate JAXB-annotated PolicySet class (derived from XACML
+	 * schema) if necessary.
+	 */
+	private static class FileBasedPolicyInitializer {
 		private final Path policyFile;
-		private StaticTopLevelPolicyElementEvaluator policyEvaluator = null;
 
-		private PolicyProxy(Path policyFile)
-		{
+		private transient PolicySet jaxbPolicySet = null;
+		private transient StaticTopLevelPolicyElementEvaluator policyEvaluator = null;
+
+		private FileBasedPolicyInitializer(Path policyFile) {
 			assert policyFile != null;
 			this.policyFile = policyFile;
 		}
 
-		private StaticTopLevelPolicyElementEvaluator getEvaluator(Deque<String> policySetRefChain) throws IndeterminateEvaluationException
-		{
+		private PolicySet getPolicySet() {
+			final URL policyURL;
+			try {
+				policyURL = policyFile.toUri().toURL();
+			} catch (MalformedURLException e) {
+				throw new IndeterminateEvaluationException(
+						"Failed to get Policy(Set) XML document from policy file: " + policyFile,
+						StatusHelper.STATUS_PROCESSING_ERROR, e);
+			}
+
+			final NamespaceFilteringParser xacmlParser;
+			final Object jaxbPolicyOrPolicySetObj;
+			try {
+				xacmlParser = xacmlParserFactory.getInstance();
+				jaxbPolicyOrPolicySetObj = xacmlParser.parse(policyURL);
+			} catch (JAXBException e) {
+				throw new IndeterminateEvaluationException(
+						"Failed to unmarshall Policy(Set) XML document from policy location: " + policyURL,
+						StatusHelper.STATUS_PROCESSING_ERROR, e);
+			}
+
+			if (!(jaxbPolicyOrPolicySetObj instanceof PolicySet)) {
+				throw new IndeterminateEvaluationException(
+						"Unexpected/unsupported element found as root of the XML document at policy location '"
+								+ policyURL + "': " + jaxbPolicyOrPolicySetObj.getClass().getSimpleName(),
+						StatusHelper.STATUS_PROCESSING_ERROR);
+
+			}
+		}
+
+		private StaticTopLevelPolicyElementEvaluator getEvaluator(Deque<String> policySetRefChain)
+				throws IndeterminateEvaluationException {
 			assert policySetRefChain != null;
 
-			if (policyEvaluator == null)
-			{
+			if (policyEvaluator == null) {
 				// PolicyEvaluator not instantiated yet
-				final URL policyURL;
-				try
-				{
-					policyURL = policyFile.toUri().toURL();
-				} catch (MalformedURLException e)
-				{
-					throw new IndeterminateEvaluationException("Failed to get Policy(Set) XML document from policy file: " + policyFile, StatusHelper.STATUS_PROCESSING_ERROR, e);
-				}
 
-				final NamespaceFilteringParser xacmlParser;
-				final Object jaxbPolicyOrPolicySetObj;
-				try
-				{
-					xacmlParser = xacmlParserFactory.getInstance();
-					jaxbPolicyOrPolicySetObj = xacmlParser.parse(policyURL);
-				} catch (JAXBException e)
-				{
-					throw new IndeterminateEvaluationException("Failed to unmarshall Policy(Set) XML document from policy location: " + policyURL, StatusHelper.STATUS_PROCESSING_ERROR, e);
-				}
-
-				if (!(jaxbPolicyOrPolicySetObj instanceof PolicySet))
-				{
-					throw new IndeterminateEvaluationException("Unexpected/unsupported element found as root of the XML document at policy location '" + policyURL + "': "
-							+ jaxbPolicyOrPolicySetObj.getClass().getSimpleName(), StatusHelper.STATUS_PROCESSING_ERROR);
-
-				}
-
-				final PolicySet jaxbPolicySet = (PolicySet) jaxbPolicyOrPolicySetObj;
-				try
-				{
-					policyEvaluator = PolicyEvaluators.getInstanceStatic(jaxbPolicySet, null, xacmlParser.getNamespacePrefixUriMap(), expressionFactory, combiningAlgRegistry,
+				jaxbPolicySet = (PolicySet) jaxbPolicyOrPolicySetObj;
+				try {
+					policyEvaluator = PolicyEvaluators.getInstanceStatic(jaxbPolicySet, null,
+							xacmlParser.getNamespacePrefixUriMap(), expressionFactory, combiningAlgRegistry,
 							FlatFileDAORefPolicyProviderModule.this, policySetRefChain);
-				} catch (IllegalArgumentException e)
-				{
-					throw new IndeterminateEvaluationException("Invalid PolicySet in file: " + policyFile, StatusHelper.STATUS_PROCESSING_ERROR, e);
+				} catch (IllegalArgumentException e) {
+					throw new IndeterminateEvaluationException("Invalid PolicySet in file: " + policyFile,
+							StatusHelper.STATUS_PROCESSING_ERROR, e);
 				}
 			}
 
@@ -223,12 +246,12 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 		}
 	}
 
-	private final Map<String, PolicyVersions<PolicyProxy>> policySetMap = new HashMap<>();
+	private final Map<String, PolicyVersions<FileBasedPolicyInitializer>> policySetMap = new HashMap<>();
 	private final int policyFilenameSuffixLength;
 
-	private FlatFileDAORefPolicyProviderModule(Path policyParentDirectory, final String suffix, XACMLParserFactory xacmlParserFactory, ExpressionFactory expressionFactory,
-			CombiningAlgRegistry combiningAlgRegistry, int maxPolicySetRefDepth)
-	{
+	private FlatFileDAORefPolicyProviderModule(Path policyParentDirectory, final String suffix,
+			XACMLParserFactory xacmlParserFactory, ExpressionFactory expressionFactory,
+			CombiningAlgRegistry combiningAlgRegistry, int maxPolicySetRefDepth) {
 		assert policyParentDirectory != null;
 		assert xacmlParserFactory != null;
 		assert expressionFactory != null;
@@ -245,23 +268,24 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 
 	}
 
+	// public static PolicyVersions
+
 	@Override
-	public StaticTopLevelPolicyElementEvaluator get(TopLevelPolicyElementType policyType, String id, VersionPatterns versionPatterns, Deque<String> ancestorPolicyRefChain)
-			throws IndeterminateEvaluationException
-	{
-		final Entry<PolicyVersion, PolicyProxy> policyEntry;
-		if (policyType == TopLevelPolicyElementType.POLICY)
-		{
+	public StaticTopLevelPolicyElementEvaluator get(TopLevelPolicyElementType policyType, String id,
+			VersionPatterns versionPatterns, Deque<String> ancestorPolicyRefChain)
+					throws IndeterminateEvaluationException {
+		final Entry<PolicyVersion, FileBasedPolicyInitializer> policyEntry;
+		if (policyType == TopLevelPolicyElementType.POLICY) {
 			throw UNSUPPORTED_POLICY_REFERENCE_EXCEPTION;
 		}
 
-		final Deque<String> newPolicyRefChain = Utils.appendAndCheckPolicyRefChain(ancestorPolicyRefChain, Collections.singletonList(id), maxPolicyRefDepth);
+		final Deque<String> newPolicyRefChain = Utils.appendAndCheckPolicyRefChain(ancestorPolicyRefChain,
+				Collections.singletonList(id), maxPolicyRefDepth);
 
 		// Request for PolicySetEvaluator (from PolicySetIdReference)
-		final PolicyVersions<PolicyProxy> oldPolicyVersions = policySetMap.get(id);
-		final PolicyVersions<PolicyProxy> newPolicyVersions;
-		if (oldPolicyVersions == null)
-		{
+		final PolicyVersions<FileBasedPolicyInitializer> oldPolicyVersions = policySetMap.get(id);
+		final PolicyVersions<FileBasedPolicyInitializer> newPolicyVersions;
+		if (oldPolicyVersions == null) {
 			newPolicyVersions = new PolicyVersions<>();
 			// policySetMap is lazily populated, so it may mean that the policy
 			// directory is there on the filesystem, but not yet added to the
@@ -269,51 +293,53 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 			// policy directory name is base64url(policyid)
 			final String policyDirname = FlatFileDAOUtils.base64UrlEncode(id);
 			final Path policyFile = policyParentDirectory.resolve(policyDirname);
-			try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyFile, dirStreamFilter))
-			{
-				for (final Path file : policyDirStream)
-				{
-					newPolicyVersions.put(new PolicyVersion(getVersion(file)), new PolicyProxy(file));
+			try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyFile, dirStreamFilter)) {
+				for (final Path file : policyDirStream) {
+					newPolicyVersions.put(new PolicyVersion(getVersion(file)), new FileBasedPolicyInitializer(file));
 				}
-			} catch (IOException e)
-			{
-				throw new IndeterminateEvaluationException("Error resolving policy reference: PolicySet '" + id + "' not available", StatusHelper.STATUS_PROCESSING_ERROR, e);
+			} catch (IOException e) {
+				throw new IndeterminateEvaluationException(
+						"Error resolving policy reference: PolicySet '" + id + "' not available",
+						StatusHelper.STATUS_PROCESSING_ERROR, e);
 			}
 
 			policySetMap.put(id, newPolicyVersions);
-
-		} else
-		{
+		} else {
 			newPolicyVersions = oldPolicyVersions;
 		}
 
 		policyEntry = newPolicyVersions.getLatest(versionPatterns);
-		if (policyEntry == null)
-		{
+		if (policyEntry == null) {
 			return null;
 		}
 
 		final int refChainLenBefore = newPolicyRefChain.size();
 		final StaticTopLevelPolicyElementEvaluator policyEvaluator;
-		try
-		{
+		try {
 			policyEvaluator = policyEntry.getValue().getEvaluator(newPolicyRefChain);
-		} catch (IndeterminateEvaluationException e)
-		{
+		} catch (IndeterminateEvaluationException e) {
 			// throw back an high-level exception message for easier
 			// troubleshooting (no file path)
 			final PolicyVersion version = policyEntry.getKey();
-			throw new IndeterminateEvaluationException("Matched PolicySet '" + id + "' (version " + version + ") is invalid or its content is unavailable", StatusHelper.STATUS_PROCESSING_ERROR, e);
+			throw new IndeterminateEvaluationException(
+					"Matched PolicySet '" + id + "' (version " + version + ") is invalid or its content is unavailable",
+					StatusHelper.STATUS_PROCESSING_ERROR, e);
 		}
 
-		final List<String> resultPolicyLongestRefChain = policyEvaluator.getExtraPolicyMetadata().getLongestPolicyRefChain();
+		final List<String> resultPolicyLongestRefChain = policyEvaluator.getExtraPolicyMetadata()
+				.getLongestPolicyRefChain();
 		/*
-		 * If there is a longest ref chain in result policy, but newPolicyRefChain was not updated with it (length unchanged, i.e. same as before the get(...)), it means the policy was already parsed
-		 * before this retrieval (longest ref chain already computed). Therefore, we need to take into account the longest policy ref chain already computed in the result policy with the current
-		 * policy ref chain up to this result policy, i.e. newPolicyRefChain; and check the total chain length.
+		 * If there is a longest ref chain in result policy, but
+		 * newPolicyRefChain was not updated with it (length unchanged, i.e.
+		 * same as before the get(...)), it means the policy was already parsed
+		 * before this retrieval (longest ref chain already computed).
+		 * Therefore, we need to take into account the longest policy ref chain
+		 * already computed in the result policy with the current policy ref
+		 * chain up to this result policy, i.e. newPolicyRefChain; and check the
+		 * total chain length.
 		 */
-		if (resultPolicyLongestRefChain != null && !resultPolicyLongestRefChain.isEmpty() && newPolicyRefChain.size() == refChainLenBefore)
-		{
+		if (resultPolicyLongestRefChain != null && !resultPolicyLongestRefChain.isEmpty()
+				&& newPolicyRefChain.size() == refChainLenBefore) {
 			// newPolicyRefChain was not updated, so we assumed the result
 			// policy was already parsed, and longest ref chain already computed
 			// To get the new longest ref chain, we need to combine the two
@@ -324,19 +350,17 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 	}
 
 	@Override
-	public TopLevelPolicyElementEvaluator get(TopLevelPolicyElementType policyType, String policyId, VersionPatterns policyVersionConstraints, Deque<String> policySetRefChain,
-			EvaluationContext evaluationCtx) throws IllegalArgumentException, IndeterminateEvaluationException
-	{
+	public TopLevelPolicyElementEvaluator get(TopLevelPolicyElementType policyType, String policyId,
+			VersionPatterns policyVersionConstraints, Deque<String> policySetRefChain, EvaluationContext evaluationCtx)
+					throws IllegalArgumentException, IndeterminateEvaluationException {
 		return get(policyType, policyId, policyVersionConstraints, policySetRefChain);
 	}
 
-	private String getVersion(Path file) throws IOException
-	{
+	private String getVersion(Path file) throws IOException {
 		assert file != null;
 
 		final Path fileName = file.getFileName();
-		if (fileName == null)
-		{
+		if (fileName == null) {
 			throw new IOException("Invalid policy version file path: " + file);
 		}
 
@@ -346,8 +370,7 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 	}
 
 	@Override
-	public void close() throws IOException
-	{
+	public void close() throws IOException {
 		policySetMap.clear();
 
 	}
