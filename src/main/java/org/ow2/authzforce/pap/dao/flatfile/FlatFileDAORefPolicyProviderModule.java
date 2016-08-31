@@ -23,24 +23,21 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.DirectoryStream;
+import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import javax.xml.bind.JAXBException;
 
-import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
-
 import org.ow2.authzforce.core.pdp.api.EnvironmentProperties;
 import org.ow2.authzforce.core.pdp.api.EvaluationContext;
 import org.ow2.authzforce.core.pdp.api.IndeterminateEvaluationException;
-import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils;
 import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils.XACMLParserFactory;
 import org.ow2.authzforce.core.pdp.api.StatusHelper;
 import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
@@ -58,6 +55,12 @@ import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
 import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
 import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDAORefPolicyProvider;
 import org.springframework.util.ResourceUtils;
+
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
+import com.koloboke.collect.map.hash.HashObjObjMaps;
+
+import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
 
 /**
  * Static Ref Policy Provider for the File-based PAP DAO. This provider expects
@@ -181,33 +184,17 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 
 	}
 
-	private final Path policyParentDirectory;
-	private final DirectoryStream.Filter<? super Path> dirStreamFilter;
-	private final XACMLParserFactory xacmlParserFactory;
-	private final ExpressionFactory expressionFactory;
-	private final CombiningAlgRegistry combiningAlgRegistry;
-	private final int maxPolicyRefDepth;
-
-	/**
-	 * Lazy initializer (from file) of PolicyEvaluators (for XACML PolicySets
-	 * only). Since the instantiation of a PolicyEvaluator from a file is
-	 * expensive, this provides a convenient way to instantiate one only when
-	 * the PolicySetId/Version is actually needed, i.e. referenced from other
-	 * policies instantiated/evaluated by the PDP. It allows to have access to
-	 * the intermediate JAXB-annotated PolicySet class (derived from XACML
-	 * schema) if necessary.
-	 */
-	private static class FileBasedPolicyInitializer
+	private static class PolicySupplier implements Supplier<PolicySet>
 	{
-		private final Path policyFile;
+		private final Path policyVersionFile;
 
 		private transient PolicySet jaxbPolicySet = null;
 		private transient volatile StaticTopLevelPolicyElementEvaluator policyEvaluator = null;
 
-		private FileBasedPolicyInitializer(final Path policyFile)
+		private PolicySupplier(final Path policyVersionFile)
 		{
-			assert policyFile != null;
-			this.policyFile = policyFile;
+			assert policyVersionFile != null;
+			this.policyVersionFile = policyVersionFile;
 		}
 
 		private PolicySet getPolicySet()
@@ -215,12 +202,12 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 			final URL policyURL;
 			try
 			{
-				policyURL = policyFile.toUri().toURL();
+				policyURL = policyVersionFile.toUri().toURL();
 			}
 			catch (final MalformedURLException e)
 			{
 				throw new IndeterminateEvaluationException(
-						"Failed to get Policy(Set) XML document from policy file: " + policyFile,
+						"Failed to get Policy(Set) XML document from policy file: " + policyVersionFile,
 						StatusHelper.STATUS_PROCESSING_ERROR, e);
 			}
 
@@ -266,21 +253,34 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 				}
 				catch (final IllegalArgumentException e)
 				{
-					throw new IndeterminateEvaluationException("Invalid PolicySet in file: " + policyFile,
+					throw new IndeterminateEvaluationException("Invalid PolicySet in file: " + policyVersionFile,
 							StatusHelper.STATUS_PROCESSING_ERROR, e);
 				}
 			}
 
 			return policyEvaluator;
 		}
+
+		@Override
+		public PolicySet get()
+		{
+			// TODO Auto-generated method stub
+			return null;
+		}
 	}
 
-	private final Map<String, PolicyVersions<FileBasedPolicyInitializer>> policySetMap = HashObjObjMaps.;
-	private final int policyFilenameSuffixLength;
+	private final DirectoryStream.Filter<? super Path> dirStreamFilter;
+	private final XACMLParserFactory xacmlParserFactory;
+	private final ExpressionFactory expressionFactory;
+	private final CombiningAlgRegistry combiningAlgRegistry;
+	private final int maxPolicyRefDepth;
+	// policyId -> cache(PolicySets by policy version)
+	private final Map<String, PolicyVersions<Supplier<PolicySet>>> policyCache;
 
 	private FlatFileDAORefPolicyProviderModule(final Path policyParentDirectory, final String suffix,
 			final XACMLParserFactory xacmlParserFactory, final ExpressionFactory expressionFactory,
 			final CombiningAlgRegistry combiningAlgRegistry, final int maxPolicySetRefDepth)
+					throws IllegalArgumentException
 	{
 		assert policyParentDirectory != null;
 		assert xacmlParserFactory != null;
@@ -290,23 +290,89 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 		FlatFileDAOUtils.checkFile("RefPolicyProvider's policy directory", policyParentDirectory, true, false);
 		/*
 		 * We don't parse all policies in directories yet because there may be
-		 * plenty of them in different versions, and it is very likely that the
-		 * root policy will reference only a few of them. Therefore, we'll do
-		 * lazy initialization, i.e. a policy will be instantiated from file on
-		 * the fly the first time it is requested, if and only if it is ever
-		 * requested. Beware of concurrency issues with lazy initialization.
+		 * plenty of them in different versions and loading a policy from file
+		 * is an expensive job, and it is very likely that the root policy will
+		 * reference only a few of them, so some of them may never be used.
+		 * Therefore, we'll do lazy initialization, i.e. a policy will be
+		 * instantiated from file on the fly the first time it is requested, if
+		 * and only if it is ever requested, in a way that is thread-safe. Also
+		 * the provider's get() should be idempotent, i.e. return the same
+		 * policy across multiple calls with same type, id, versionPatterns. In
+		 * short, this is a good use case for local in-memory caching, e.g. with
+		 * Guava Cache.
 		 */
-		this.policyParentDirectory = policyParentDirectory;
-		this.dirStreamFilter = new SuffixMatchingDirectoryStreamFilter(suffix);
-		this.policyFilenameSuffixLength = suffix.length();
+		/*
+		 * To size the cache, we count files in the policy parent directory.
+		 * There should not be more than that as there should only be at most
+		 * one version per policy that is being used at a time
+		 * directly/indrectly by the root policy (best practice), else the
+		 * policy evaluation may have unexpected / hard-to-troubleshoot
+		 * behavior.
+		 */
+		final Map<String, PolicyVersions<Supplier<PolicySet>>> updatablePolicyMap = HashObjObjMaps.newUpdatableMap();
+		// filter matching specifc file suffix for policy files
+		final Filter<? super Path> policyFilenameSuffixMatchingDirStreamFilter = new SuffixMatchingDirectoryStreamFilter(
+				suffix);
+		try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirectory,
+				FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
+		{
+			// Browse directories of policies, one for each policy ID
+			for (final Path policyVersionsDir : policyParentDirStream)
+			{
+				final String policyDirName = policyVersionsDir.getFileName().toString();
+				final String policyId;
+				try
+				{
+					policyId = FlatFileDAOUtils.base64UrlDecode(policyDirName);
+				}
+				catch (final IllegalArgumentException e)
+				{
+					throw new IllegalArgumentException(
+							"Invalid policy directory: bad filename (not Base64URL-encoded): " + policyDirName, e);
+				}
+
+				final Map<PolicyVersion, Supplier<PolicySet>> policySetSuppliersByVersion = HashObjObjMaps
+						.newUpdatableMap();
+				// Browse policy versions, one policy file for each version of
+				// the current policy
+				try (final DirectoryStream<Path> policyVersionsDirStream = Files.newDirectoryStream(policyVersionsDir,
+						policyFilenameSuffixMatchingDirStreamFilter))
+				{
+					for (final Path policyVersionFile : policyVersionsDirStream)
+					{
+						/*
+						 * The PolicyEvaluator supplier (from file) allows to
+						 * instantiate the Evaluator only if needed, because the
+						 * instantiation of a PolicyEvaluator from a file is
+						 * expensive.
+						 */
+						policySetSuppliersByVersion.put(
+								new PolicyVersion(FlatFileDAOUtils.getPrefix(policyVersionFile, suffix.length())),
+								Suppliers.memoize(new PolicySupplier(policyVersionFile)));
+					}
+				}
+				catch (final IOException e)
+				{
+					throw new IllegalArgumentException("Error listing files of each version of policy '" + policyId
+							+ "' in directory: " + policyParentDirectory, e);
+				}
+
+				final PolicyVersions<Supplier<PolicySet>> versions = new PolicyVersions<>(policySetSuppliersByVersion);
+				updatablePolicyMap.put(policyId, versions);
+			}
+		}
+		catch (final IOException e)
+		{
+			throw new IllegalArgumentException(
+					"Error listing files in policies parent directory '" + policyParentDirectory, e);
+		}
+
+		this.policyCache = HashObjObjMaps.newImmutableMap(updatablePolicyMap);
 		this.xacmlParserFactory = xacmlParserFactory;
 		this.expressionFactory = expressionFactory;
 		this.combiningAlgRegistry = combiningAlgRegistry;
 		this.maxPolicyRefDepth = maxPolicySetRefDepth;
-
 	}
-
-	// public static PolicyVersions
 
 	@Override
 	public StaticTopLevelPolicyElementEvaluator get(final TopLevelPolicyElementType policyType, final String id,
@@ -409,25 +475,10 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 		return get(policyType, policyId, policyVersionConstraints, policySetRefChain);
 	}
 
-	private String getVersion(final Path file) throws IOException
-	{
-		assert file != null;
-
-		final Path fileName = file.getFileName();
-		if (fileName == null)
-		{
-			throw new IOException("Invalid policy version file path: " + file);
-		}
-
-		final String filename = fileName.toString();
-		return filename.substring(0, filename.length() - policyFilenameSuffixLength);
-
-	}
-
 	@Override
 	public void close() throws IOException
 	{
-		policySetMap.clear();
+		this.policyCache.clear();
 
 	}
 

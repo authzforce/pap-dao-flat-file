@@ -32,7 +32,12 @@ import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
+import java.util.NavigableSet;
+import java.util.TreeSet;
 
+import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
+
+import com.google.common.base.Preconditions;
 import com.google.common.io.BaseEncoding;
 
 /**
@@ -44,7 +49,8 @@ public final class FlatFileDAOUtils
 	// java.util.Base64.getURLEncoder() when moving to Java 8
 	private static final BaseEncoding BASE64URL_NO_PADDING_ENCODING = BaseEncoding.base64Url().omitPadding();
 
-	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null file arg");
+	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException(
+			"Null file arg");
 
 	/**
 	 * Encode bytes with base64url specified by RFC 4648, without padding
@@ -53,39 +59,62 @@ public final class FlatFileDAOUtils
 	 *            input
 	 * @return encoded result
 	 */
-	public static String base64UrlEncode(byte[] bytes)
+	public static String base64UrlEncode(final byte[] bytes)
 	{
 		return BASE64URL_NO_PADDING_ENCODING.encode(bytes);
 	}
 
 	/**
-	 * Encode string with base64url specified by RFC 4648, without padding. Used to create filenames compatible with most filesystems
+	 * Encode string with base64url specified by RFC 4648, without padding. Used
+	 * to create filenames compatible with most filesystems
 	 * 
 	 * @param input
 	 *            input
 	 * @return encoded result
 	 */
-	public static String base64UrlEncode(String input)
+	public static String base64UrlEncode(final String input)
 	{
 		return BASE64URL_NO_PADDING_ENCODING.encode(input.getBytes(StandardCharsets.UTF_8));
 	}
 
 	/**
-	 * Decode string encoded with {@link FlatFileDAOUtils#base64UrlEncode(String)}
+	 * Decode string encoded with
+	 * {@link FlatFileDAOUtils#base64UrlEncode(String)}
 	 * 
 	 * @param encoded
 	 *            input
-	 * @return decoded result, i.e. original string encoded with {@link FlatFileDAOUtils#base64UrlEncode(String)}
+	 * @return decoded result, i.e. original string encoded with
+	 *         {@link FlatFileDAOUtils#base64UrlEncode(String)}
 	 * @throws IllegalArgumentException
-	 *             if the input is not a valid encoded string according to base64url encoding without padding
+	 *             if the input is not a valid encoded string according to
+	 *             base64url encoding without padding
 	 */
-	public static String base64UrlDecode(String encoded) throws IllegalArgumentException
+	public static String base64UrlDecode(final String encoded) throws IllegalArgumentException
 	{
 		return new String(BASE64URL_NO_PADDING_ENCODING.decode(encoded), StandardCharsets.UTF_8);
 	}
 
-	private FlatFileDAOUtils()
+	/**
+	 * Get part of filename before given suffix
+	 * 
+	 * @param file
+	 * @param filenameSuffixLength
+	 * @return prefix
+	 * @throws IOException
+	 */
+	public static String getPrefix(final Path file, final int filenameSuffixLength) throws IOException
 	{
+		assert file != null;
+
+		final Path fileName = file.getFileName();
+		if (fileName == null)
+		{
+			throw new IOException("Invalid file path: " + file);
+		}
+
+		final String filename = fileName.toString();
+		return filename.substring(0, filename.length() - filenameSuffixLength);
+
 	}
 
 	/**
@@ -100,9 +129,11 @@ public final class FlatFileDAOUtils
 	 * @param canwrite
 	 *            true if and only if file is expected to be writable
 	 * @throws IllegalArgumentException
-	 *             if {@code file == null || !file.exists() || !file.canRead() || (isdirectory && !file.isDirectory()) || (!isdirectory && file.isDirectory()) || (canwrite && !file.canWrite())}
+	 *             if
+	 *             {@code file == null || !file.exists() || !file.canRead() || (isdirectory && !file.isDirectory()) || (!isdirectory && file.isDirectory()) || (canwrite && !file.canWrite())}
 	 */
-	public static void checkFile(String friendlyname, Path file, boolean isdirectory, boolean canwrite) throws IllegalArgumentException
+	public static void checkFile(final String friendlyname, final Path file, final boolean isdirectory,
+			final boolean canwrite) throws IllegalArgumentException
 	{
 		if (file == null)
 		{
@@ -133,12 +164,28 @@ public final class FlatFileDAOUtils
 	}
 
 	/**
-	 * Directory entry filter that accepts only regular files with a given extension/suffix
+	 * Directory entry filter that accepts only sub-directories
+	 *
+	 */
+	public static final DirectoryStream.Filter<Path> SUB_DIRECTORY_STREAM_FILTER = new DirectoryStream.Filter<Path>()
+	{
+
+		@Override
+		public boolean accept(final Path entry) throws IOException
+		{
+			return Files.isDirectory(entry);
+		}
+	};
+
+	/**
+	 * Directory entry filter that accepts only regular files with a given
+	 * extension/suffix
 	 *
 	 */
 	public static final class SuffixMatchingDirectoryStreamFilter implements DirectoryStream.Filter<Path>
 	{
 		private final PathMatcher pathSuffixMatcher;
+		private final String pathSuffix;
 
 		/**
 		 * Creates filter from a filename extension/suffix
@@ -146,16 +193,26 @@ public final class FlatFileDAOUtils
 		 * @param suffix
 		 *            filename suffix to be matched
 		 */
-		public SuffixMatchingDirectoryStreamFilter(String suffix)
+		public SuffixMatchingDirectoryStreamFilter(final String suffix)
 		{
+			this.pathSuffix = suffix;
 			this.pathSuffixMatcher = FileSystems.getDefault().getPathMatcher("glob:*" + suffix);
 		}
 
-		@Override
-		public boolean accept(Path entry) throws IOException
+		/**
+		 * Get the filename suffix used for filtering
+		 * 
+		 * @return the matched filename suffix
+		 */
+		public String getMatchedSuffix()
 		{
-			final boolean isAccepted = Files.isRegularFile(entry) && Files.isReadable(entry) && pathSuffixMatcher.matches(entry.getFileName());
-			return isAccepted;
+			return this.pathSuffix;
+		}
+
+		@Override
+		public boolean accept(final Path entry) throws IOException
+		{
+			return Files.isRegularFile(entry) && pathSuffixMatcher.matches(entry.getFileName());
 		}
 	}
 
@@ -165,27 +222,29 @@ public final class FlatFileDAOUtils
 		private final Path source;
 		private final Path target;
 
-		private CopyingFileVisitor(Path source, Path target)
+		private CopyingFileVisitor(final Path source, final Path target)
 		{
 			this.source = source;
 			this.target = target;
 		}
 
 		@Override
-		public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException
+		public FileVisitResult visitFile(final Path file, final BasicFileAttributes attributes) throws IOException
 		{
 			Files.copy(file, target.resolve(source.relativize(file)));
 			return FileVisitResult.CONTINUE;
 		}
 
 		@Override
-		public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException
+		public FileVisitResult preVisitDirectory(final Path directory, final BasicFileAttributes attributes)
+				throws IOException
 		{
 			final Path targetDirectory = target.resolve(source.relativize(directory));
 			try
 			{
 				Files.copy(directory, targetDirectory);
-			} catch (FileAlreadyExistsException e)
+			}
+			catch (final FileAlreadyExistsException e)
 			{
 				if (!Files.isDirectory(targetDirectory))
 				{
@@ -199,7 +258,7 @@ public final class FlatFileDAOUtils
 	private static FileVisitor<Path> DELETING_FILE_VISITOR = new SimpleFileVisitor<Path>()
 	{
 		@Override
-		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException
+		public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) throws IOException
 		{
 			if (attrs.isRegularFile())
 			{
@@ -210,7 +269,7 @@ public final class FlatFileDAOUtils
 		}
 
 		@Override
-		public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException
+		public FileVisitResult postVisitDirectory(final Path dir, final IOException exc) throws IOException
 		{
 
 			if (exc == null)
@@ -226,41 +285,149 @@ public final class FlatFileDAOUtils
 	/**
 	 * Copy a directory recursively to another (does not follow links)
 	 * 
-	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not the case so far.
+	 * We could use commons-io library for this, if it were using the new
+	 * java.nio.file API available since Java 7, not the case so far.
 	 * 
 	 * @param source
 	 *            source directory
 	 * @param target
 	 *            target directory
 	 * @param maxDepth
-	 *            maximum number of levels of directories to copy. A value of 0 means that only the starting directory is visited.
+	 *            maximum number of levels of directories to copy. A value of 0
+	 *            means that only the starting directory is visited.
 	 * @throws IllegalArgumentException
 	 *             if the maxDepth parameter is negative
 	 * @throws IOException
 	 *             file copy error
 	 */
-	public static void copyDirectory(Path source, Path target, int maxDepth) throws IOException, IllegalArgumentException
+	public static void copyDirectory(final Path source, final Path target, final int maxDepth)
+			throws IOException, IllegalArgumentException
 	{
-		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(), maxDepth, new CopyingFileVisitor(source, target));
+		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(), maxDepth,
+				new CopyingFileVisitor(source, target));
 	}
 
 	/**
 	 * Delete a directory recursively
 	 * 
-	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not the case so far.
+	 * We could use commons-io library for this, if it were using the new
+	 * java.nio.file API available since Java 7, not the case so far.
 	 * 
 	 * @param dir
 	 *            directory
 	 * @param maxDepth
-	 *            maximum number of levels of directories to delete. A value of 0 means that only the starting file is visited.
+	 *            maximum number of levels of directories to delete. A value of
+	 *            0 means that only the starting file is visited.
 	 * @throws IllegalArgumentException
 	 *             if the maxDepth parameter is negative
 	 * @throws IOException
 	 *             file deletion error
 	 */
-	public static void deleteDirectory(Path dir, int maxDepth) throws IOException, IllegalArgumentException
+	public static void deleteDirectory(final Path dir, final int maxDepth) throws IOException, IllegalArgumentException
 	{
 		Files.walkFileTree(dir, Collections.<FileVisitOption> emptySet(), maxDepth, DELETING_FILE_VISITOR);
+	}
+
+	/**
+	 * Get latest version of a Policy(Set) document in a directory where each
+	 * file is named '${version}suffix' representing a specific XACML
+	 * Policy(Set) Version (${version}) of this document
+	 * 
+	 * @param versionsDirectory
+	 *            directory containing the Policy(Set) version files
+	 * @param filenameSuffixMatchingFilter
+	 *            file filter that accepts only policy filenames with a specific
+	 *            suffix (e.g. '.xml')
+	 * @return latest version
+	 * @throws IOException
+	 *             error Error listing files in {@code versionsDirectory}
+	 * @throws NullPointerException
+	 *             if {@code versionsDirectory == null}
+	 */
+	public static PolicyVersion getLatestPolicyVersion(final Path versionsDirectory,
+			final SuffixMatchingDirectoryStreamFilter filenameSuffixMatchingFilter) throws IOException
+	{
+		Preconditions.checkNotNull(versionsDirectory, "Undefined versionsDirectory");
+		Preconditions.checkNotNull(versionsDirectory, "Undefined filenameSuffixMatchingFilter");
+		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(versionsDirectory,
+				filenameSuffixMatchingFilter))
+		{
+			PolicyVersion latestVersion = null;
+			for (final Path policyVersionFilePath : policyDirStream)
+			{
+				final Path policyVersionFileName = policyVersionFilePath.getFileName();
+				if (policyVersionFileName == null)
+				{
+					throw new IOException("Invalid policy file path: " + policyVersionFilePath);
+				}
+
+				final String versionPlusSuffix = policyVersionFileName.toString();
+				final String versionId = versionPlusSuffix.substring(0,
+						versionPlusSuffix.length() - filenameSuffixMatchingFilter.pathSuffix.length());
+				final PolicyVersion version = new PolicyVersion(versionId);
+				if (latestVersion == null || latestVersion.compareTo(version) < 0)
+				{
+					latestVersion = version;
+				}
+			}
+			return latestVersion;
+		}
+		catch (final IOException e)
+		{
+			throw e;
+		}
+	}
+
+	/**
+	 * Get versions of a Policy(Set) document, sorted from latest to oldest,
+	 * from a directory where each file is named '${version}suffix' representing
+	 * a specific XACML Policy(Set) Version (${version}) of this document
+	 * 
+	 * @param versionsDirectory
+	 *            directory containing the Policy(Set) version files
+	 * @param filenameSuffixMatchingFilter
+	 *            file filter that accepts only policy filenames with a specific
+	 *            suffix (e.g. '.xml'); if null, no filtering
+	 * @return versions sorted from latest to oldest
+	 * @throws IOException
+	 *             error Error listing files in {@code versionsDirectory}
+	 * @throws NullPointerException
+	 *             if {@code versionsDirectory == null}
+	 */
+	public static NavigableSet<PolicyVersion> getPolicyVersions(final Path versionsDirectory,
+			final SuffixMatchingDirectoryStreamFilter filenameSuffixMatchingFilter) throws IOException
+	{
+		Preconditions.checkNotNull(versionsDirectory, "Undefined versionsDirectory");
+		Preconditions.checkNotNull(versionsDirectory, "Undefined filenameSuffixMatchingFilter");
+		final TreeSet<PolicyVersion> versions = new TreeSet<>(Collections.reverseOrder());
+		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(versionsDirectory,
+				filenameSuffixMatchingFilter))
+		{
+			for (final Path policyVersionFilePath : policyDirStream)
+			{
+				final Path policyVersionFileName = policyVersionFilePath.getFileName();
+				if (policyVersionFileName == null)
+				{
+					throw new IOException("Invalid policy file path: " + policyVersionFilePath);
+				}
+
+				final String versionPlusSuffix = policyVersionFileName.toString();
+				final String versionId = versionPlusSuffix.substring(0,
+						versionPlusSuffix.length() - filenameSuffixMatchingFilter.pathSuffix.length());
+				final PolicyVersion version = new PolicyVersion(versionId);
+				versions.add(version);
+			}
+		}
+		catch (final IOException e)
+		{
+			throw e;
+		}
+
+		return versions;
+	}
+
+	private FlatFileDAOUtils()
+	{
 	}
 
 	// public static void main(String[] args)
