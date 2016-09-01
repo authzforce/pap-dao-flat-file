@@ -76,6 +76,9 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import oasis.names.tc.xacml._3_0.core.schema.wd_17.IdReferenceType;
+import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
+
 import org.ow2.authzforce.core.pap.api.dao.DomainDAOClient;
 import org.ow2.authzforce.core.pap.api.dao.DomainsDAO;
 import org.ow2.authzforce.core.pap.api.dao.PdpFeature;
@@ -120,9 +123,6 @@ import com.fasterxml.uuid.EthernetAddress;
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedGenerator;
 
-import oasis.names.tc.xacml._3_0.core.schema.wd_17.IdReferenceType;
-import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
-
 /**
  * Filesystem-based policy domain repository DAO
  * 
@@ -149,27 +149,19 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	private static final IllegalArgumentException ILLEGAL_CONSTRUCTOR_ARGS_EXCEPTION = new IllegalArgumentException(
 			"One of the following FileBasedDomainsDAO constructor arguments is undefined although required: domainsRoot == null || domainTmpl == null || schema == null || pdpModelHandler == null || domainDAOClientFactory == null || policyDAOClientFactory == null");
 
-	private static final IllegalArgumentException NULL_DOMAIN_ID_ARG_EXCEPTION = new IllegalArgumentException(
-			"Undefined domain ID arg");
+	private static final IllegalArgumentException NULL_DOMAIN_ID_ARG_EXCEPTION = new IllegalArgumentException("Undefined domain ID arg");
 
 	private static final IllegalArgumentException ILLEGAL_POLICY_NOT_STATIC_EXCEPTION = new IllegalArgumentException(
 			"One of the policy finders in the domain PDP configuration is not static, or one of the policies required by PDP cannot be statically resolved");
 
-	private static final RuntimeException NON_STATIC_POLICY_EXCEPTION = new RuntimeException(
-			"Unexpected error: Some policies are not statically resolved (pdp.getStaticApplicablePolicies() == null)");
+	private static final RuntimeException NON_STATIC_POLICY_EXCEPTION = new RuntimeException("Unexpected error: Some policies are not statically resolved (pdp.getStaticApplicablePolicies() == null)");
 
-	private static final IllegalArgumentException NULL_POLICY_ARGUMENT_EXCEPTION = new IllegalArgumentException(
-			"Null policySet arg");
-	private static final IllegalArgumentException NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException(
-			"Null domain properties arg");
-	private static final IllegalArgumentException NULL_PRP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException(
-			"Null domain PRP properties arg");
-	private static final IllegalArgumentException NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException(
-			"Null domain PDP properties arg");
-	private static final IllegalArgumentException NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION = new IllegalArgumentException(
-			"Invalid domain PDP properties arg: rootPolicyRef undefined");
-	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException(
-			"Null attributeProviders arg");
+	private static final IllegalArgumentException NULL_POLICY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null policySet arg");
+	private static final IllegalArgumentException NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain properties arg");
+	private static final IllegalArgumentException NULL_PRP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain PRP properties arg");
+	private static final IllegalArgumentException NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain PDP properties arg");
+	private static final IllegalArgumentException NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION = new IllegalArgumentException("Invalid domain PDP properties arg: rootPolicyRef undefined");
+	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null attributeProviders arg");
 
 	private static final TreeSet<PolicyVersion> EMPTY_TREE_SET = new TreeSet<>();
 
@@ -221,16 +213,14 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 	}
 
-	private static final DateFormat UTC_DATE_WITH_MILLIS_FORMATTER = new SimpleDateFormat(
-			"yyyy-MM-dd HH:mm:ss.SSS ('UTC')");
+	private static final DateFormat UTC_DATE_WITH_MILLIS_FORMATTER = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS ('UTC')");
 
 	static
 	{
 		UTC_DATE_WITH_MILLIS_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
-	private static final IllegalArgumentException INVALID_FEATURE_ID_EXCEPTION = new IllegalArgumentException(
-			"Invalid feature ID: undefined");
+	private static final IllegalArgumentException INVALID_FEATURE_ID_EXCEPTION = new IllegalArgumentException("Invalid feature ID: undefined");
 
 	private static class ReadableDomainPropertiesImpl implements ReadableDomainProperties
 	{
@@ -275,8 +265,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		private final int maxVersionCountPerPolicy;
 		private final boolean isVersionRollingEnabled;
 
-		private PrpRWPropertiesImpl(final int maxPolicyCount, final int maxVersionCountPerPolicy,
-				final boolean enableVersionRolling)
+		private PrpRWPropertiesImpl(final int maxPolicyCount, final int maxVersionCountPerPolicy, final boolean enableVersionRolling)
 		{
 			this.maxPolicyCount = maxPolicyCount;
 			this.maxVersionCountPerPolicy = maxVersionCountPerPolicy;
@@ -312,12 +301,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		private final List<IdReferenceType> applicableRefPolicyRefs;
 		private final long lastModified;
 
-		private ReadablePdpPropertiesImpl(final List<PdpFeature> features,
-				final IdReferenceType rootPolicyRefExpression, final IdReferenceType applicableRootPolicyRef,
+		private ReadablePdpPropertiesImpl(final List<PdpFeature> features, final IdReferenceType rootPolicyRefExpression, final IdReferenceType applicableRootPolicyRef,
 				final List<IdReferenceType> applicableRefPolicyRefs, final long lastModified)
 		{
-			assert rootPolicyRefExpression != null && applicableRootPolicyRef != null && applicableRefPolicyRefs != null
-					&& features != null;
+			assert rootPolicyRefExpression != null && applicableRootPolicyRef != null && applicableRefPolicyRefs != null && features != null;
 
 			this.features = features;
 			this.rootPolicyRefExpression = rootPolicyRefExpression;
@@ -365,40 +352,32 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	{
 
 		/**
-		 * Features that are not related to extensions like the ones below, but
-		 * to Authzforce PDP's core engine. Considered as the default type, if
-		 * undefined.
+		 * Features that are not related to extensions like the ones below, but to Authzforce PDP's core engine. Considered as the default type, if undefined.
 		 */
 		CORE("urn:ow2:authzforce:feature-type:pdp:core", null),
 
 		/**
-		 * XACML Attribute DataType extension, corresponding to Authzforce PDP
-		 * engine's configuration element <i>attributeDatatype</i>
+		 * XACML Attribute DataType extension, corresponding to Authzforce PDP engine's configuration element <i>attributeDatatype</i>
 		 */
 		DATATYPE("urn:ow2:authzforce:feature-type:pdp:data-type", DatatypeFactory.class),
 
 		/**
-		 * XACML function extension, corresponding to Authzforce PDP engine's
-		 * configuration element <i>function</i>
+		 * XACML function extension, corresponding to Authzforce PDP engine's configuration element <i>function</i>
 		 */
 		FUNCTION("urn:ow2:authzforce:feature-type:pdp:function", Function.class),
 
 		/**
-		 * Policy/Rule combining algorithm extension, corresponding to
-		 * Authzforce PDP engine's configuration element
-		 * <i>combiningAlgorithm</i>
+		 * Policy/Rule combining algorithm extension, corresponding to Authzforce PDP engine's configuration element <i>combiningAlgorithm</i>
 		 */
 		COMBINING_ALGORITHM("urn:ow2:authzforce:feature-type:pdp:combining-algorithm", CombiningAlg.class),
 
 		/**
-		 * XACML Request filter, corresponding to Authzforce PDP engine's
-		 * configuration element <i>requestFilter</i>
+		 * XACML Request filter, corresponding to Authzforce PDP engine's configuration element <i>requestFilter</i>
 		 */
 		REQUEST_FILTER("urn:ow2:authzforce:feature-type:pdp:request-filter", RequestFilter.Factory.class),
 
 		/**
-		 * XACML Result filter, corresponding to Authzforce Core PDP engine's
-		 * configuration element <i>resultFilter</i>
+		 * XACML Result filter, corresponding to Authzforce Core PDP engine's configuration element <i>resultFilter</i>
 		 */
 		RESULT_FILTER("urn:ow2:authzforce:feature-type:pdp:result-filter", DecisionResultFilter.class);
 
@@ -451,14 +430,12 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	public static enum PdpCoreFeature
 	{
 		/**
-		 * Corresponds to Authzforce PDP engine's configuration attribute
-		 * <i>enableXPath</i>
+		 * Corresponds to Authzforce PDP engine's configuration attribute <i>enableXPath</i>
 		 */
 		XPATH_EVAL("urn:ow2:authzforce:feature:pdp:core:xpath-eval"),
 
 		/**
-		 * Corresponds to Authzforce PDP engine's configuration attribute
-		 * <i>strictAttributeIssuerMatch</i>
+		 * Corresponds to Authzforce PDP engine's configuration attribute <i>strictAttributeIssuerMatch</i>
 		 */
 		STRICT_ATTRIBUTE_ISSUER_MATCH("urn:ow2:authzforce:feature:pdp:core:strict-attribute-issuer-match");
 
@@ -489,8 +466,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 	}
 
-	private static final Map<PdpFeatureType, Set<String>> PDP_FEATURE_IDENTIFIERS_BY_TYPE = new EnumMap<>(
-			PdpFeatureType.class);
+	private static final Map<PdpFeatureType, Set<String>> PDP_FEATURE_IDENTIFIERS_BY_TYPE = new EnumMap<>(PdpFeatureType.class);
 	private static final int PDP_FEATURE_COUNT;
 
 	static
@@ -521,23 +497,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	}
 
 	/**
-	 * Initializes a UUID generator that generates UUID version 1. It is
-	 * thread-safe and uses the host MAC address as the node field if
-	 * useRandomAddressBasedUUID = false, in which case UUID uniqueness across
-	 * multiple hosts (e.g. in a High-Availability architecture) is guaranteed.
-	 * If this is used by multiple hosts to generate UUID for common objects
-	 * (e.g. in a High Availability architecture), it is critical that clocks of
-	 * all hosts be synchronized (e.g. with a common NTP server). If no MAC
-	 * address is available, e.g. no network connection, set
-	 * useRandomAddressBasedUUID = true to use a random multicast address
-	 * instead as node field.
+	 * Initializes a UUID generator that generates UUID version 1. It is thread-safe and uses the host MAC address as the node field if useRandomAddressBasedUUID = false, in which case UUID uniqueness
+	 * across multiple hosts (e.g. in a High-Availability architecture) is guaranteed. If this is used by multiple hosts to generate UUID for common objects (e.g. in a High Availability architecture),
+	 * it is critical that clocks of all hosts be synchronized (e.g. with a common NTP server). If no MAC address is available, e.g. no network connection, set useRandomAddressBasedUUID = true to use
+	 * a random multicast address instead as node field.
 	 * 
-	 * @see <a href=
-	 *      "http://www.cowtowncoder.com/blog/archives/2010/10/entry_429.html">
-	 *      More on Java UUID Generator (JUG), a word on performance</a>
-	 * @see <a href=
-	 *      "http://johannburkard.de/blog/programming/java/Java-UUID-generators-compared.html">
-	 *      Java UUID generators compared</a>
+	 * @see <a href= "http://www.cowtowncoder.com/blog/archives/2010/10/entry_429.html"> More on Java UUID Generator (JUG), a word on performance</a>
+	 * @see <a href= "http://johannburkard.de/blog/programming/java/Java-UUID-generators-compared.html"> Java UUID generators compared</a>
 	 * 
 	 * @return UUID v1
 	 */
@@ -631,9 +597,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		private final ScheduledExecutorService dirToMemSyncScheduler;
 
 		/*
-		 * Last time when external ID in domain maps was synced with repository
-		 * (properties file in domain directory (set respectively by
-		 * saveProperties() and loadProperties() methods only)
+		 * Last time when external ID in domain maps was synced with repository (properties file in domain directory (set respectively by saveProperties() and loadProperties() methods only)
 		 */
 		private volatile long propertiesFileLastSyncedTime = 0;
 
@@ -642,8 +606,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		private volatile PDPImpl pdp = null;
 
 		/*
-		 * Last time when PDP was (re)loaded from repository (pdp conf and
-		 * policy files in domain directory) (set only by reloadPDP)
+		 * Last time when PDP was (re)loaded from repository (pdp conf and policy files in domain directory) (set only by reloadPDP)
 		 */
 		private volatile long lastPdpSyncedTime = 0;
 
@@ -651,9 +614,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		public DomainProperties sync() throws IOException, IllegalArgumentException
 		{
 			/*
-			 * synchonized block makes sure no other thread is messing with the
-			 * domain directory while we synchronize it to domainMap. See also
-			 * method #add(Properties)
+			 * synchonized block makes sure no other thread is messing with the domain directory while we synchronize it to domainMap. See also method #add(Properties)
 			 */
 			final DomainProperties props;
 			synchronized (domainDirPath)
@@ -677,8 +638,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				final boolean isChanged = syncPDP();
 				if (isChanged)
 				{
-					LOGGER.info("Domain '{}': synchronization: change to PDP files since last sync -> PDP reloaded",
-							domainId);
+					LOGGER.info("Domain '{}': synchronization: change to PDP files since last sync -> PDP reloaded", domainId);
 				}
 
 				LOGGER.debug("Domain '{}': synchronization done.", domainId);
@@ -713,26 +673,21 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		 * @param domainDirPath
 		 *            domain directory
 		 * @param jaxbCtx
-		 *            JAXB context for marshalling/unmarshalling configuration
-		 *            data
+		 *            JAXB context for marshalling/unmarshalling configuration data
 		 * @param confSchema
 		 *            domain's XML configuration schema
 		 * @param pdpModelHandler
 		 *            PDP configuration model handler
 		 * @param domainMapEntry
-		 *            proxy to entry in domains map where all domains are
-		 *            registry (e.g. to self-remove from the map)
+		 *            proxy to entry in domains map where all domains are registry (e.g. to self-remove from the map)
 		 * @param props
-		 *            new domain properties for new domain creation, null if no
-		 *            specific properties (use default properties)
+		 *            new domain properties for new domain creation, null if no specific properties (use default properties)
 		 * @throws IllegalArgumentException
 		 *             Invalid configuration files in {@code domainDir}
 		 * @throws IOException
-		 *             Error loading configuration file(s) from or persisting
-		 *             {@code props} (if not null) to {@code domainDir}
+		 *             Error loading configuration file(s) from or persisting {@code props} (if not null) to {@code domainDir}
 		 */
-		private FileBasedDomainDAOImpl(final Path domainDirPath, final WritableDomainProperties props)
-				throws IOException
+		private FileBasedDomainDAOImpl(final Path domainDirPath, final WritableDomainProperties props) throws IOException
 		{
 			assert domainDirPath != null;
 
@@ -750,8 +705,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 			// PDP configuration parser environment properties, e.g. PARENT_DIR
 			// for replacement in configuration strings
-			this.pdpConfEnvProps = new DefaultEnvironmentProperties(
-					Collections.singletonMap(EnvironmentPropertyName.PARENT_DIR, domainDirPath.toUri().toString()));
+			this.pdpConfEnvProps = new DefaultEnvironmentProperties(Collections.singletonMap(EnvironmentPropertyName.PARENT_DIR, domainDirPath.toUri().toString()));
 
 			// PDP config file
 			this.pdpConfFile = domainDirPath.resolve(DOMAIN_PDP_CONFIG_FILENAME).toFile();
@@ -766,15 +720,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			if (!(refPolicyProvider instanceof StaticFlatFileDAORefPolicyProvider))
 			{
 				// critical error
-				throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "' in file '"
-						+ pdpConfFile + "': refPolicyProvider is not an instance of "
+				throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "' in file '" + pdpConfFile + "': refPolicyProvider is not an instance of "
 						+ StaticFlatFileDAORefPolicyProvider.class + " as expected.");
 			}
 
 			final StaticFlatFileDAORefPolicyProvider fileBasedRefPolicyProvider = (StaticFlatFileDAORefPolicyProvider) refPolicyProvider;
 			// replace any ${PARENT_DIR} placeholder in policy location pattern
-			final String policyLocation = pdpConfEnvProps
-					.replacePlaceholders(fileBasedRefPolicyProvider.getPolicyLocationPattern());
+			final String policyLocation = pdpConfEnvProps.replacePlaceholders(fileBasedRefPolicyProvider.getPolicyLocationPattern());
 			final Entry<Path, String> result = FlatFileDAORefPolicyProviderModule.validateConf(policyLocation);
 			this.policyParentDirPath = result.getKey();
 			FlatFileDAOUtils.checkFile("Domain policies directory", policyParentDirPath, true, true);
@@ -788,8 +740,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			if (props == null)
 			{
 				/*
-				 * Validate and reload domain properties file, load in
-				 * particular the externalId in the externalId-to-domainId map
+				 * Validate and reload domain properties file, load in particular the externalId in the externalId-to-domainId map
 				 */
 				getDomainProperties();
 			}
@@ -803,19 +754,16 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			reloadPDP();
 
 			/*
-			 * Schedule periodic domain directory-to-memory synchronization task
-			 * if sync enabled (strictly positive interval defined)
+			 * Schedule periodic domain directory-to-memory synchronization task if sync enabled (strictly positive interval defined)
 			 */
 			if (domainDirToMemSyncIntervalSec > 0)
 			{
 				// Sync enabled
 				final DirectoryToMemorySyncTask syncTask = new DirectoryToMemorySyncTask();
 				dirToMemSyncScheduler = Executors.newScheduledThreadPool(1);
-				dirToMemSyncScheduler.scheduleWithFixedDelay(syncTask, domainDirToMemSyncIntervalSec,
-						domainDirToMemSyncIntervalSec, TimeUnit.SECONDS);
-				LOGGER.info(
-						"Domain '{}': scheduled periodic directory-to-memory synchronization (initial delay={}s, period={}s)",
-						domainId, domainDirToMemSyncIntervalSec, domainDirToMemSyncIntervalSec);
+				dirToMemSyncScheduler.scheduleWithFixedDelay(syncTask, domainDirToMemSyncIntervalSec, domainDirToMemSyncIntervalSec, TimeUnit.SECONDS);
+				LOGGER.info("Domain '{}': scheduled periodic directory-to-memory synchronization (initial delay={}s, period={}s)", domainId, domainDirToMemSyncIntervalSec,
+						domainDirToMemSyncIntervalSec);
 			}
 			else
 			{
@@ -836,9 +784,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Reload PDP from configuration files, (including policy files, aka
-		 * "PRP" in XACML). This method first sets lastPdpSyncedTime to the
-		 * current time.
+		 * Reload PDP from configuration files, (including policy files, aka "PRP" in XACML). This method first sets lastPdpSyncedTime to the current time.
 		 * 
 		 * @throws IOException
 		 *             I/O error reading from confFile
@@ -870,14 +816,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Reload PDP with input JAXB conf, and persist conf to file if PDP
-		 * reloaded successfully
+		 * Reload PDP with input JAXB conf, and persist conf to file if PDP reloaded successfully
 		 * 
 		 * @param pdpConfTemplate
-		 *            original PDP configuration template from file, i.e. before
-		 *            any replacement of property placeholders like
-		 *            ${PARENT_DIR}; saved/marshalled to file PDP update
-		 *            succeeds
+		 *            original PDP configuration template from file, i.e. before any replacement of property placeholders like ${PARENT_DIR}; saved/marshalled to file PDP update succeeds
 		 * @throws IllegalArgumentException
 		 * @throws IOException
 		 */
@@ -935,9 +877,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			try
 			{
 				/*
-				 * The rootPolicyRef is in another file (PDP configuration
-				 * file). We cannot marshall more generic
-				 * ManagedResourceProperties because it does not have
+				 * The rootPolicyRef is in another file (PDP configuration file). We cannot marshall more generic ManagedResourceProperties because it does not have
 				 * 
 				 * @XmlRootElement
 				 */
@@ -984,9 +924,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		private void updateCachedExternalId(final String newExternalId)
 		{
 			/*
-			 * Synchronized block makes sure the domain's cachedExternalId is
-			 * synchronized with the corresponding value in
-			 * domainIDsByExternalId map for that domain's Id
+			 * Synchronized block makes sure the domain's cachedExternalId is synchronized with the corresponding value in domainIDsByExternalId map for that domain's Id
 			 */
 			synchronized (domainsRootDir)
 			{
@@ -1014,8 +952,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public ReadableDomainProperties setDomainProperties(final WritableDomainProperties props)
-				throws IOException, IllegalArgumentException
+		public ReadableDomainProperties setDomainProperties(final WritableDomainProperties props) throws IOException, IllegalArgumentException
 		{
 			if (props == null)
 			{
@@ -1050,11 +987,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			final boolean isFileModified = lastModifiedTime > propertiesFileLastSyncedTime;
 			if (LOGGER.isDebugEnabled())
 			{
-				LOGGER.debug(
-						"Domain '{}': domain properties file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
-						domainId, propertiesFile, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
-						isFileModified ? ">" : "<=",
-						UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(propertiesFileLastSyncedTime)),
+				LOGGER.debug("Domain '{}': domain properties file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}", domainId, propertiesFile,
+						UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)), isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(propertiesFileLastSyncedTime)),
 						isFileModified ? " -> updating externalId in externalId-to-domain map" : "");
 			}
 
@@ -1083,11 +1017,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Loads original PDP configuration template from file, before any
-		 * replacement of property placeholders like ${PARENT_DIR}
+		 * Loads original PDP configuration template from file, before any replacement of property placeholders like ${PARENT_DIR}
 		 * 
-		 * @return original PDP configuration from file (no property like
-		 *         PARENT_DIR replaced in the process)
+		 * @return original PDP configuration from file (no property like PARENT_DIR replaced in the process)
 		 * @throws IOException
 		 */
 		private Pdp loadPDPConfTmpl() throws IOException
@@ -1105,11 +1037,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Sync PDP's applicable policies with the policy repository on the
-		 * filesystem
+		 * Sync PDP's applicable policies with the policy repository on the filesystem
 		 * 
-		 * @return true iff the PDP was reloaded during the process, i.e. if
-		 *         some change to policy files was found
+		 * @return true iff the PDP was reloaded during the process, i.e. if some change to policy files was found
 		 * @throws IllegalArgumentException
 		 * @throws IOException
 		 */
@@ -1124,9 +1054,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			for (final Entry<String, PolicyVersion> usedPolicy : pdpApplicablePolicies)
 			{
 				/*
-				 * Check whether there is any change to the directory of this
-				 * policy, in which case we have to reload the PDP to take any
-				 * account any new version that might match the direct/indirect
+				 * Check whether there is any change to the directory of this policy, in which case we have to reload the PDP to take any account any new version that might match the direct/indirect
 				 * policy references from the root policy
 				 */
 				final String policyId = usedPolicy.getKey();
@@ -1142,10 +1070,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					catch (final Throwable t)
 					{
 						/*
-						 * a critical error occurred, maybe because the deleted
-						 * policy is still referenced by the root policy anyway,
-						 * this means the PDP configuration or policies in the
-						 * domain directory are in a bad state
+						 * a critical error occurred, maybe because the deleted policy is still referenced by the root policy anyway, this means the PDP configuration or policies in the domain
+						 * directory are in a bad state
 						 */
 						setPdpInErrorState();
 						throw new RuntimeException(
@@ -1160,17 +1086,12 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 				// used policy file is there, checked whether changed since last
 				// sync
-				final long lastModifiedTime = Files.getLastModifiedTime(policyDir, LinkOption.NOFOLLOW_LINKS)
-						.toMillis();
+				final long lastModifiedTime = Files.getLastModifiedTime(policyDir, LinkOption.NOFOLLOW_LINKS).toMillis();
 				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
 				if (LOGGER.isDebugEnabled())
 				{
-					LOGGER.debug(
-							"Domain '{}': policy '{}': file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
-							domainId, policyId, policyDir,
-							UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
-							isFileModified ? ">" : "<=",
-							UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
+					LOGGER.debug("Domain '{}': policy '{}': file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}", domainId, policyId, policyDir,
+							UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)), isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
 							isFileModified ? " -> reloading PDP" : "");
 				}
 
@@ -1183,10 +1104,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					catch (final Throwable t)
 					{
 						/*
-						 * a critical error occurred, maybe because the deleted
-						 * policy is still referenced by the root policy anyway,
-						 * this means the PDP configuration or policies in the
-						 * domain directory are in a bad state
+						 * a critical error occurred, maybe because the deleted policy is still referenced by the root policy anyway, this means the PDP configuration or policies in the domain
+						 * directory are in a bad state
 						 */
 						setPdpInErrorState();
 						throw new RuntimeException(
@@ -1204,12 +1123,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Reload PDP only if a change to one of PDP files (main configuration,
-		 * policies...) has been detected. Should be called inside a
-		 * synchronized(domainDirPath) block
+		 * Reload PDP only if a change to one of PDP files (main configuration, policies...) has been detected. Should be called inside a synchronized(domainDirPath) block
 		 * 
-		 * @return true iff PDP was actually changed by synchronization
-		 *         (reloaded)
+		 * @return true iff PDP was actually changed by synchronization (reloaded)
 		 * @throws IOException
 		 * @throws IllegalArgumentException
 		 */
@@ -1220,9 +1136,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
 			if (LOGGER.isDebugEnabled())
 			{
-				LOGGER.debug("Domain '{}': PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
-						domainId, pdpConfFile, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
-						isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
+				LOGGER.debug("Domain '{}': PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}", domainId, pdpConfFile,
+						UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)), isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
 						isFileModified ? " -> reloading PDP" : "");
 			}
 
@@ -1238,9 +1153,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 		/**
 		 * 
-		 * @return list of static policy references, the first one is always the
-		 *         root policy reference, others - if any - are policy
-		 *         references from the root policy (direct or indirect)
+		 * @return list of static policy references, the first one is always the root policy reference, others - if any - are policy references from the root policy (direct or indirect)
 		 */
 		private List<IdReferenceType> getPdpApplicablePolicyRefs()
 		{
@@ -1251,14 +1164,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 
 			final List<IdReferenceType> staticPolicyRefs = new ArrayList<>();
-			final IdReferenceType staticRootPolicyRef = new IdReferenceType(pdpApplicablePolicies.rootPolicyId(),
-					pdpApplicablePolicies.rootPolicyExtraMetadata().getVersion().toString(), null, null);
+			final IdReferenceType staticRootPolicyRef = new IdReferenceType(pdpApplicablePolicies.rootPolicyId(), pdpApplicablePolicies.rootPolicyExtraMetadata().getVersion().toString(), null, null);
 			staticPolicyRefs.add(staticRootPolicyRef);
-			for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpApplicablePolicies.rootPolicyExtraMetadata()
-					.getRefPolicySets().entrySet())
+			for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpApplicablePolicies.rootPolicyExtraMetadata().getRefPolicySets().entrySet())
 			{
-				staticPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(),
-						enabledPolicyEntry.getValue().toString(), null, null));
+				staticPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(), enabledPolicyEntry.getValue().toString(), null, null));
 			}
 
 			return staticPolicyRefs;
@@ -1292,8 +1202,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 									}
 									break;
 								default:
-									throw new UnsupportedOperationException(
-											"Unsupported PDP CORE feature: " + coreFeature.id);
+									throw new UnsupportedOperationException("Unsupported PDP CORE feature: " + coreFeature.id);
 							}
 						}
 
@@ -1317,8 +1226,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 					case RESULT_FILTER:
 						final String resultFilter = pdpConf.getResultFilter();
-						enabledFeatures = resultFilter == null ? Collections.<String> emptySet()
-								: Collections.<String> singleton(resultFilter);
+						enabledFeatures = resultFilter == null ? Collections.<String> emptySet() : Collections.<String> singleton(resultFilter);
 						break;
 
 					default:
@@ -1342,8 +1250,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public ReadablePdpProperties setOtherPdpProperties(final WritablePdpProperties properties)
-				throws IOException, IllegalArgumentException
+		public ReadablePdpProperties setOtherPdpProperties(final WritablePdpProperties properties) throws IOException, IllegalArgumentException
 		{
 			if (properties == null)
 			{
@@ -1363,15 +1270,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				final Pdp pdpConf = loadPDPConfTmpl();
 
 				/*
-				 * First check whether rootPolicyRef is the same/unchanged to
-				 * avoid useless PDP reload (loading a new PDP is costly)
+				 * First check whether rootPolicyRef is the same/unchanged to avoid useless PDP reload (loading a new PDP is costly)
 				 */
 				final AbstractPolicyProvider rootPolicyProvider = pdpConf.getRootPolicyProvider();
 				if (!(rootPolicyProvider instanceof StaticRefBasedRootPolicyProvider))
 				{
 					// critical error
-					throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "'"
-							+ "': rootPolicyProvider is not an instance of " + StaticRefBasedRootPolicyProvider.class
+					throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "'" + "': rootPolicyProvider is not an instance of " + StaticRefBasedRootPolicyProvider.class
 							+ " as expected.");
 				}
 
@@ -1415,8 +1320,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 						nonNullFeatureType = PdpFeatureType.fromId(inputFeatureTypeId);
 						if (nonNullFeatureType == null)
 						{
-							throw new IllegalArgumentException("Invalid feature type: '" + inputFeatureTypeId
-									+ "'. Expected: " + PdpFeatureType.IDENTIFIERS);
+							throw new IllegalArgumentException("Invalid feature type: '" + inputFeatureTypeId + "'. Expected: " + PdpFeatureType.IDENTIFIERS);
 						}
 					}
 
@@ -1425,8 +1329,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					final Set<String> validFeatureIDs = PDP_FEATURE_IDENTIFIERS_BY_TYPE.get(nonNullFeatureType);
 					if (!validFeatureIDs.contains(featureID))
 					{
-						throw new IllegalArgumentException("Invalid " + nonNullFeatureType + " feature: '" + featureID
-								+ "'. Expected: " + validFeatureIDs);
+						throw new IllegalArgumentException("Invalid " + nonNullFeatureType + " feature: '" + featureID + "'. Expected: " + validFeatureIDs);
 					}
 
 					if (!featureIDs.add(featureID))
@@ -1455,8 +1358,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 									pdpConf.setStrictAttributeIssuerMatch(true);
 									break;
 								default:
-									throw new UnsupportedOperationException("Unsupported " + nonNullFeatureType
-											+ " feature: '" + featureID + "'. Expected: " + validFeatureIDs);
+									throw new UnsupportedOperationException("Unsupported " + nonNullFeatureType + " feature: '" + featureID + "'. Expected: " + validFeatureIDs);
 							}
 
 							break;
@@ -1475,15 +1377,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 						case REQUEST_FILTER:
 							/*
-							 * If current is different from default, it means it
-							 * is already set, in which case we raise an error
-							 * because only one such feature may be set at at
-							 * time
+							 * If current is different from default, it means it is already set, in which case we raise an error because only one such feature may be set at at time
 							 */
 							if (!pdpConf.getRequestFilter().equals(defaultRequestFilter))
 							{
-								throw new IllegalArgumentException("More than one " + nonNullFeatureType
-										+ " feature enabled. Only one feature of this type may be enabled at a time.");
+								throw new IllegalArgumentException("More than one " + nonNullFeatureType + " feature enabled. Only one feature of this type may be enabled at a time.");
 							}
 
 							pdpConf.setRequestFilter(featureID);
@@ -1491,21 +1389,18 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 						case RESULT_FILTER:
 							/*
-							 * If already set, we raise an error because at most
-							 * one such feature may be set a time
+							 * If already set, we raise an error because at most one such feature may be set a time
 							 */
 							if (pdpConf.getResultFilter() != null)
 							{
-								throw new IllegalArgumentException("More than one " + nonNullFeatureType
-										+ " feature enabled. Only one feature of this type may be enabled at a time.");
+								throw new IllegalArgumentException("More than one " + nonNullFeatureType + " feature enabled. Only one feature of this type may be enabled at a time.");
 							}
 
 							pdpConf.setResultFilter(featureID);
 							break;
 
 						default:
-							throw new UnsupportedOperationException("Unsupported PDP feature type: '"
-									+ nonNullFeatureType.id + "'. Expected: " + PdpFeatureType.IDENTIFIERS);
+							throw new UnsupportedOperationException("Unsupported PDP feature type: '" + nonNullFeatureType.id + "'. Expected: " + PdpFeatureType.IDENTIFIERS);
 					}
 				} // END COLLECT INPUT FEATURES
 
@@ -1514,8 +1409,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 				final List<PdpFeature> pdpFeatures = getPdpFeatures(pdpConf);
 				final List<IdReferenceType> activePolicyRefs = getPdpApplicablePolicyRefs();
-				return new ReadablePdpPropertiesImpl(pdpFeatures, newRootPolicyRefExpression, activePolicyRefs.get(0),
-						activePolicyRefs.subList(1, activePolicyRefs.size()), lastPdpSyncedTime);
+				return new ReadablePdpPropertiesImpl(pdpFeatures, newRootPolicyRefExpression, activePolicyRefs.get(0), activePolicyRefs.subList(1, activePolicyRefs.size()), lastPdpSyncedTime);
 			}
 		}
 
@@ -1529,10 +1423,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
 				if (LOGGER.isDebugEnabled())
 				{
-					LOGGER.debug("Domain '{}': PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
-							domainId, pdpConfFile, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
-							isFileModified ? ">" : "<=",
-							UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
+					LOGGER.debug("Domain '{}': PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}", domainId, pdpConfFile,
+							UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)), isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
 							isFileModified ? " -> reload PDP" : "");
 				}
 
@@ -1544,8 +1436,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				if (!(rootPolicyProvider instanceof StaticRefBasedRootPolicyProvider))
 				{
 					// critical error
-					throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "'"
-							+ "': rootPolicyProvider is not an instance of " + StaticRefBasedRootPolicyProvider.class
+					throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "'" + "': rootPolicyProvider is not an instance of " + StaticRefBasedRootPolicyProvider.class
 							+ " as expected.");
 				}
 
@@ -1570,9 +1461,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				// Collect PDP features
 				final List<PdpFeature> features = getPdpFeatures(pdpConf);
 				final List<IdReferenceType> activePolicyRefs = getPdpApplicablePolicyRefs();
-				return new ReadablePdpPropertiesImpl(features,
-						((StaticRefBasedRootPolicyProvider) rootPolicyProvider).getPolicyRef(), activePolicyRefs.get(0),
-						activePolicyRefs.subList(1, activePolicyRefs.size()), lastPdpSyncedTime);
+				return new ReadablePdpPropertiesImpl(features, ((StaticRefBasedRootPolicyProvider) rootPolicyProvider).getPolicyRef(), activePolicyRefs.get(0), activePolicyRefs.subList(1,
+						activePolicyRefs.size()), lastPdpSyncedTime);
 			}
 		}
 
@@ -1588,8 +1478,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public List<AbstractAttributeProvider> setAttributeProviders(
-				final List<AbstractAttributeProvider> attributeproviders) throws IOException, IllegalArgumentException
+		public List<AbstractAttributeProvider> setAttributeProviders(final List<AbstractAttributeProvider> attributeproviders) throws IOException, IllegalArgumentException
 		{
 			if (attributeproviders == null)
 			{
@@ -1622,10 +1511,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				final boolean isFileModified = lastModifiedTime > lastPdpSyncedTime;
 				if (LOGGER.isDebugEnabled())
 				{
-					LOGGER.debug("Domain '{}': PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}",
-							domainId, pdpConfFile, UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)),
-							isFileModified ? ">" : "<=",
-							UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
+					LOGGER.debug("Domain '{}': PDP conf file '{}': lastModifiedTime (= {}) {} last sync time (= {}){}", domainId, pdpConfFile,
+							UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastModifiedTime)), isFileModified ? ">" : "<=", UTC_DATE_WITH_MILLIS_FORMATTER.format(new Date(lastPdpSyncedTime)),
 							isFileModified ? " -> reloading PDP" : "");
 				}
 
@@ -1657,51 +1544,21 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Get/load policy from file
-		 * 
-		 * @param policyFile
-		 * @return policy; null if policyFile does not exists or is not a file
-		 * @throws IOException
-		 */
-		private PolicySet loadPolicy(final File policyFile) throws IOException
-		{
-			assert policyFile != null;
-
-			if (!policyFile.exists() || !policyFile.isFile())
-			{
-				return null;
-			}
-
-			final JAXBElement<PolicySet> policyElt;
-			try
-			{
-				final Unmarshaller unmarshaller = JaxbXACMLUtils.createXacml3Unmarshaller();
-				policyElt = unmarshaller.unmarshal(new StreamSource(policyFile), PolicySet.class);
-			}
-			catch (final JAXBException e)
-			{
-				throw new IOException("Error getting a policy of domain '" + domainId + "'", e);
-			}
-
-			return policyElt.getValue();
-		}
-
-		/**
 		 * Save/write policy to file
 		 * 
 		 * @param file
 		 *            target file
 		 * @throws IOException
 		 */
-		private void savePolicy(final PolicySet policy, final File file) throws IOException
+		private void savePolicy(final PolicySet policy, final Path path) throws IOException
 		{
 			assert policy != null;
-			assert file != null;
+			assert path != null;
 
 			try
 			{
 				final Marshaller marshaller = JaxbXACMLUtils.createXacml3Marshaller();
-				marshaller.marshal(policy, file);
+				marshaller.marshal(policy, path.toFile());
 			}
 			catch (final JAXBException e)
 			{
@@ -1715,8 +1572,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public PolicySet addPolicy(final PolicySet policySet)
-				throws IOException, IllegalArgumentException, TooManyPoliciesException
+		public PolicySet addPolicy(final PolicySet policySet) throws IOException, IllegalArgumentException, TooManyPoliciesException
 		{
 			if (policySet == null)
 			{
@@ -1726,11 +1582,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			final String policyId = policySet.getPolicySetId();
 			final Path policyDirPath = getPolicyDirectory(policyId);
 			final PolicyVersion policyVersion = new PolicyVersion(policySet.getVersion());
-			final File policyVersionFile = getPolicyVersionPath(policyDirPath, policyVersion).toFile();
+			final Path policyVersionFile = getPolicyVersionPath(policyDirPath, policyVersion);
 
 			synchronized (domainDirPath)
 			{
-				if (policyVersionFile.exists())
+				if (Files.exists(policyVersionFile, LinkOption.NOFOLLOW_LINKS))
 				{
 					/*
 					 * conflict: same policy version already exists, return it
@@ -1738,32 +1594,34 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					// make sure the PDP is in sync with the returned policy
 					// version
 					syncPDP();
-					return loadPolicy(policyVersionFile);
+					try
+					{
+						return FlatFileDAOUtils.loadPolicy(policyVersionFile);
+					}
+					catch (final JAXBException e)
+					{
+						throw new IOException("Error getting a policy of domain '" + domainId + "'", e);
+					}
 				}
 
 				final DomainProperties domainProps = loadProperties();
 				final BigInteger maxPolicyCount = domainProps.getMaxPolicyCount();
 				final BigInteger maxVersionCountPerPolicy = domainProps.getMaxVersionCountPerPolicy();
-				final TooManyPoliciesException maxNumOfVersionsReachedException = new TooManyPoliciesException(
-						"Max number of versions (" + maxVersionCountPerPolicy
-								+ ") reached for the policy and none can be removed");
+				final TooManyPoliciesException maxNumOfVersionsReachedException = new TooManyPoliciesException("Max number of versions (" + maxVersionCountPerPolicy
+						+ ") reached for the policy and none can be removed");
 
 				/*
-				 * Policy version does not exist, but does the policy has any
-				 * version already, i.e. does a directory exist for the policy?
+				 * Policy version does not exist, but does the policy has any version already, i.e. does a directory exist for the policy?
 				 */
 				if (!Files.exists(policyDirPath))
 				{
 					/*
-					 * No such directory -> new policy (and new version a
-					 * fortiori) check whether limit of number of policies is
-					 * reached
+					 * No such directory -> new policy (and new version a fortiori) check whether limit of number of policies is reached
 					 */
 					if (maxPolicyCount != null)
 					{
 						int existingPolicyCount = 0;
-						try (final DirectoryStream<Path> policyParentDirStream = Files
-								.newDirectoryStream(policyParentDirPath, FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
+						try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath, FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
 						{
 							final Iterator<Path> policyDirIterator = policyParentDirStream.iterator();
 							while (policyDirIterator.hasNext())
@@ -1774,20 +1632,15 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 						}
 						catch (final IOException e)
 						{
-							throw new IOException("Error listing files in policies directory '" + policyParentDirPath
-									+ "' of domain '" + domainId + "'", e);
+							throw new IOException("Error listing files in policies directory '" + policyParentDirPath + "' of domain '" + domainId + "'", e);
 						}
 
 						if (existingPolicyCount >= maxPolicyCount.intValue())
 						{
 							/*
-							 * We already reached or exceeded the max, so if we
-							 * add one more as we are about to do, we have too
-							 * many anyway (existingPolicyCount >
-							 * maxNumOfPoliciesPerDomain)
+							 * We already reached or exceeded the max, so if we add one more as we are about to do, we have too many anyway (existingPolicyCount > maxNumOfPoliciesPerDomain)
 							 */
-							throw new TooManyPoliciesException(
-									"Max number of policies (" + maxPolicyCount + ") reached for the domain");
+							throw new TooManyPoliciesException("Max number of policies (" + maxPolicyCount + ") reached for the domain");
 						}
 					}
 
@@ -1797,8 +1650,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					}
 					catch (final IOException e)
 					{
-						throw new IOException("Error creating directory '" + policyDirPath + "' for new policy '"
-								+ policyId + "' in domain '" + domainId + "'", e);
+						throw new IOException("Error creating directory '" + policyDirPath + "' for new policy '" + policyId + "' in domain '" + domainId + "'", e);
 					}
 				}
 
@@ -1811,27 +1663,19 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				if (maxVersionCountPerPolicy != null)
 				{
 					/*
-					 * Number of policies to remove in case auto removal of
-					 * excess versions is enabled is: number of current versions
-					 * + the new one to be added - max
+					 * Number of policies to remove in case auto removal of excess versions is enabled is: number of current versions + the new one to be added - max
 					 */
 					excessOfPolicyVersionsToBeRemoved = policyVersions.size() + 1 - maxVersionCountPerPolicy.intValue();
 					/*
-					 * if excessOfPolicyVersionsToBeRemoved > 0, we cannot add
-					 * one more (that would cause policyVersions.size() >
-					 * maxNumOfVersionsPerPolicy). In this case, if
-					 * removeOldestVersionsIfMaxExceeded property is false, we
-					 * cannot remove any version to allow for the new one ->
-					 * throw an error
+					 * if excessOfPolicyVersionsToBeRemoved > 0, we cannot add one more (that would cause policyVersions.size() > maxNumOfVersionsPerPolicy). In this case, if
+					 * removeOldestVersionsIfMaxExceeded property is false, we cannot remove any version to allow for the new one -> throw an error
 					 */
 					if (excessOfPolicyVersionsToBeRemoved > 0 && !domainProps.isVersionRollingEnabled())
 					{
 						/*
-						 * Oldest versions will not be removed, therefore we
-						 * cannot add policies anymore without exceeding max
+						 * Oldest versions will not be removed, therefore we cannot add policies anymore without exceeding max
 						 */
-						throw new TooManyPoliciesException("Max number of versions (" + maxVersionCountPerPolicy
-								+ ") reached for the policy and none can be removed");
+						throw new TooManyPoliciesException("Max number of versions (" + maxVersionCountPerPolicy + ") reached for the policy and none can be removed");
 					}
 				}
 				else
@@ -1841,15 +1685,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				}
 
 				/*
-				 * The new policy may be saved now, even if not valid, since it
-				 * has to be saved, before we can test it by reloading the PDP.
-				 * The PDP reload is absolutely necessary if and only if the new
-				 * policy is likely to be applicable (match a direct/indirect
-				 * policy reference from root policy), i.e. if a policy with
-				 * same ID is already applicable but with an earlier version
-				 * than the input one, so the input one may replace it. To know
-				 * whether there is such policy, we do syncPDP() first to get
-				 * the latest view of applicable policies before we save the new
+				 * The new policy may be saved now, even if not valid, since it has to be saved, before we can test it by reloading the PDP. The PDP reload is absolutely necessary if and only if the
+				 * new policy is likely to be applicable (match a direct/indirect policy reference from root policy), i.e. if a policy with same ID is already applicable but with an earlier version
+				 * than the input one, so the input one may replace it. To know whether there is such policy, we do syncPDP() first to get the latest view of applicable policies before we save the new
 				 * input one.
 				 */
 				syncPDP();
@@ -1858,11 +1696,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				if (requiredPolicyVersion != null && requiredPolicyVersion.compareTo(policyVersion) < 0)
 				{
 					/*
-					 * new policy version may be applicable instead of
-					 * requiredPolicyVersion (because policy with same ID
-					 * already applicable but earlier than the new one, and we
-					 * know the PDP ('s policy finder takes the latest possible
-					 * applicable policy version)
+					 * new policy version may be applicable instead of requiredPolicyVersion (because policy with same ID already applicable but earlier than the new one, and we know the PDP ('s
+					 * policy finder takes the latest possible applicable policy version)
 					 */
 					try
 					{
@@ -1878,15 +1713,12 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				}
 
 				/*
-				 * Make sure that if there are too many versions (with the new
-				 * one), we can actually remove enough old versions to make
-				 * place for the new one. First
+				 * Make sure that if there are too many versions (with the new one), we can actually remove enough old versions to make place for the new one. First
 				 */
 				if (excessOfPolicyVersionsToBeRemoved > 0)
 				{
 					/*
-					 * too many versions, we need to remove some (the oldest
-					 * that are not required by the PDP)
+					 * too many versions, we need to remove some (the oldest that are not required by the PDP)
 					 */
 					final Iterator<PolicyVersion> oldestToLatestVersionIterator = policyVersions.descendingIterator();
 					int numRemoved = 0;
@@ -1901,7 +1733,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 							continue;
 						}
 
-						final File vFile = getPolicyVersionPath(policyId, version).toFile();
+						final Path vFile = getPolicyVersionPath(policyId, version);
 						removePolicyVersionFile(vFile, null);
 						if (version.equals(policyVersion))
 						{
@@ -1948,21 +1780,40 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			synchronized (domainDirPath)
 			{
 				syncPDP();
-				final File policyVersionFile = getPolicyVersionPath(policyId, version).toFile();
-				return loadPolicy(policyVersionFile);
+				final Path policyVersionFile = getPolicyVersionPath(policyId, version);
+				if (!Files.exists(policyVersionFile, LinkOption.NOFOLLOW_LINKS))
+				{
+					// no such policy version
+					return null;
+				}
+
+				try
+				{
+					return FlatFileDAOUtils.loadPolicy(policyVersionFile);
+				}
+				catch (IllegalArgumentException | JAXBException e)
+				{
+					throw new IOException("Error getting policy version from file '" + policyVersionFile + "'", e);
+				}
 			}
 		}
 
-		private void removePolicyVersionFile(final File policyVersionFile, final Throwable causeForRemoving)
-				throws IOException
+		private void removePolicyVersionFile(final Path policyVersionFilepath, final Throwable causeForRemoving) throws IOException
 		{
-			if (policyVersionFile.delete())
+			try
 			{
-				// Check whether the policy directory is left empty (no more
-				// version)
-				final Path policyDirPath = policyVersionFile.getParentFile().toPath();
-				try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath,
-						policyFilePathFilter))
+				Files.deleteIfExists(policyVersionFilepath);
+
+				/*
+				 * Check whether the policy directory is left empty (no more version)
+				 */
+				final Path policyDirPath = policyVersionFilepath.getParent();
+				if (!Files.exists(policyDirPath, LinkOption.NOFOLLOW_LINKS))
+				{
+					return;
+				}
+
+				try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath, policyFilePathFilter))
 				{
 					if (!policyDirStream.iterator().hasNext())
 					{
@@ -1973,38 +1824,32 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				}
 				catch (final IOException e)
 				{
-					throw new IOException("Error checking if policy directory '" + policyDirPath
-							+ "' is empty or removing it after removing last version"
-							+ (causeForRemoving == null ? ""
-									: " causing PDP instantiation failure: " + causeForRemoving)
-							+ ". Please delete the directory manually and reload the domain.", e);
+					throw new IOException("Error checking if policy directory '" + policyDirPath + "' is empty or removing it after removing last version"
+							+ (causeForRemoving == null ? "" : " causing PDP instantiation failure: " + causeForRemoving) + ". Please delete the directory manually and reload the domain.", e);
 				}
+
 			}
-			else
+			catch (final IOException e)
 			{
-				throw new IOException(
-						"Failed to delete policy file: '" + policyVersionFile + "'"
-								+ (causeForRemoving == null ? "" : " causing PDP instantiation failure: "),
-						causeForRemoving);
+
+				throw new IOException("Failed to delete policy file: '" + policyVersionFilepath + "'" + (causeForRemoving == null ? "" : " causing PDP instantiation failure: " + e.getMessage()), e);
 			}
 		}
 
 		@Override
-		public PolicySet removePolicyVersion(final String policyId, final PolicyVersion version)
-				throws IOException, IllegalArgumentException
+		public PolicySet removePolicyVersion(final String policyId, final PolicyVersion version) throws IOException, IllegalArgumentException
 		{
 			if (policyId == null || version == null)
 			{
 				return null;
 			}
 
-			final File policyVersionFile = getPolicyVersionPath(policyId, version).toFile();
+			final Path policyVersionFile = getPolicyVersionPath(policyId, version);
 			final PolicySet policy;
 			synchronized (domainDirPath)
 			{
 				/*
-				 * Check whether it is not used by the PDP. First make sure the
-				 * PDP is up-to-date with the repository
+				 * Check whether it is not used by the PDP. First make sure the PDP is up-to-date with the repository
 				 */
 				syncPDP();
 				final PolicyVersion requiredPolicyVersion = pdp.getStaticApplicablePolicies().getPolicySet(policyId);
@@ -2014,7 +1859,20 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 							+ " cannot be removed because it is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
 				}
 
-				policy = loadPolicy(policyVersionFile);
+				if (!Files.exists(policyVersionFile, LinkOption.NOFOLLOW_LINKS))
+				{
+					// already absent
+					return null;
+				}
+
+				try
+				{
+					policy = FlatFileDAOUtils.loadPolicy(policyVersionFile);
+				}
+				catch (final JAXBException e)
+				{
+					throw new IOException("Error getting policy version from file '" + policyVersionFile + "'", e);
+				}
 				// if there is no such policy version, nothing to remove
 				if (policy == null)
 				{
@@ -2048,17 +1906,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 
 			/*
-			 * We could cache this, but this is meant to be used as a DAO in a
-			 * REST API, i.e. the API should be stateless as much as possible.
-			 * Therefore, we should avoid caching when performance is not
-			 * critical (the performance-critical part is getPDP() only). Also
-			 * this should be in sync as much as possible with the filesystem.
+			 * We could cache this, but this is meant to be used as a DAO in a REST API, i.e. the API should be stateless as much as possible. Therefore, we should avoid caching when performance is
+			 * not critical (the performance-critical part is getPDP() only). Also this should be in sync as much as possible with the filesystem.
 			 */
 			/*
-			 * Make sure the PDP is in sync/consistent with the info returned
-			 * (last version)
+			 * Make sure the PDP is in sync/consistent with the info returned (last version)
 			 */
-			PolicyVersion latestVersion = null;
+			Entry<PolicyVersion, Path> latestVersionAndFilepath = null;
 			synchronized (domainDirPath)
 			{
 				final Path policyDirPath = getPolicyDirectory(policyId);
@@ -2069,28 +1923,25 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 				try
 				{
-					latestVersion = FlatFileDAOUtils.getLatestPolicyVersion(policyDirPath, policyFilePathFilter);
+					latestVersionAndFilepath = FlatFileDAOUtils.getLatestPolicyVersion(policyDirPath, policyFilePathFilter);
 				}
 				catch (final IOException e)
 				{
-					throw new IOException("Error listing policy version files in policy directory '" + policyDirPath
-							+ "' of domain '" + domainId + "'", e);
+					throw new IOException("Error listing policy version files in policy directory '" + policyDirPath + "' of domain '" + domainId + "'", e);
 				}
 
 				// Sync the PDP with info returned
 				syncPDP();
 			}
 
-			return latestVersion;
+			return latestVersionAndFilepath.getKey();
 		}
 
 		/**
-		 * Get policy versions from policy directory, ordered from latest to
-		 * oldest
+		 * Get policy versions from policy directory, ordered from latest to oldest
 		 * 
 		 * @param policyDirPath
-		 * @return versions; empty if directory does not exist or is not a
-		 *         directory
+		 * @return versions; empty if directory does not exist or is not a directory
 		 * @throws IOException
 		 */
 		private NavigableSet<PolicyVersion> getPolicyVersions(final Path policyDirPath) throws IOException
@@ -2108,8 +1959,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 			catch (final IOException e)
 			{
-				throw new IOException("Error listing policy version files in policy directory '" + policyDirPath
-						+ "' of domain '" + domainId + "'", e);
+				throw new IOException("Error listing policy version files in policy directory '" + policyDirPath + "' of domain '" + domainId + "'", e);
 			}
 		}
 
@@ -2117,8 +1967,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		 * Get number of policy versions from policy directory
 		 * 
 		 * @param policyDirPath
-		 * @return number of versions; 0 if directory does not exist or is not a
-		 *         directory
+		 * @return number of versions; 0 if directory does not exist or is not a directory
 		 * @throws IOException
 		 */
 		private int getPolicyVersionCount(final Path policyDirPath) throws IOException
@@ -2131,8 +1980,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 
 			int count = 0;
-			try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath,
-					policyFilePathFilter))
+			try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(policyDirPath, policyFilePathFilter))
 			{
 
 				final Iterator<Path> versionFileIterator = policyDirStream.iterator();
@@ -2145,8 +1993,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 			catch (final IOException e)
 			{
-				throw new IOException("Error listing policy version files in policy directory '" + policyDirPath
-						+ "' of domain '" + domainId + "'", e);
+				throw new IOException("Error listing policy version files in policy directory '" + policyDirPath + "' of domain '" + domainId + "'", e);
 			}
 
 			return count;
@@ -2162,11 +2009,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 			final NavigableSet<PolicyVersion> versions;
 			/*
-			 * We could cache this, but this is meant to be used as a DAO in a
-			 * REST API, i.e. the API should be stateless as much as possible.
-			 * Therefore, we should avoid caching when performance is not
-			 * critical (the performance-critical part is getPDP() only). Also
-			 * this should be in sync as much as possible with the filesystem.
+			 * We could cache this, but this is meant to be used as a DAO in a REST API, i.e. the API should be stateless as much as possible. Therefore, we should avoid caching when performance is
+			 * not critical (the performance-critical part is getPDP() only). Also this should be in sync as much as possible with the filesystem.
 			 */
 			synchronized (domainDirPath)
 			{
@@ -2192,8 +2036,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public NavigableSet<PolicyVersion> removePolicy(final String policyId)
-				throws IOException, IllegalArgumentException
+		public NavigableSet<PolicyVersion> removePolicy(final String policyId) throws IOException, IllegalArgumentException
 		{
 			if (policyId == null)
 			{
@@ -2208,8 +2051,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				requiredPolicyVersion = pdp.getStaticApplicablePolicies().getPolicySet(policyId);
 				if (requiredPolicyVersion != null)
 				{
-					throw new IllegalArgumentException("Policy '" + policyId
-							+ "' cannot be removed because this policy (version " + requiredPolicyVersion
+					throw new IllegalArgumentException("Policy '" + policyId + "' cannot be removed because this policy (version " + requiredPolicyVersion
 							+ ") is still used by the PDP, either as root policy or referenced directly/indirectly by the root policy.");
 				}
 
@@ -2239,15 +2081,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		private int getPolicyCount() throws IOException
 		{
 			/*
-			 * We could cache this, but this is meant to be used as a DAO in a
-			 * REST API, i.e. the API should be as stateless as possible.
-			 * Therefore, we should avoid caching when performance is not
-			 * critical (the performance-critical part is getPDP() only). Also
-			 * this should be in sync as much as possible with the filesystem.
+			 * We could cache this, but this is meant to be used as a DAO in a REST API, i.e. the API should be as stateless as possible. Therefore, we should avoid caching when performance is not
+			 * critical (the performance-critical part is getPDP() only). Also this should be in sync as much as possible with the filesystem.
 			 */
 			int count = 0;
-			try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath,
-					FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
+			try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath, FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
 			{
 				final Iterator<Path> policyDirIterator = policyParentDirStream.iterator();
 				while (policyDirIterator.hasNext())
@@ -2258,8 +2096,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 			catch (final IOException e)
 			{
-				throw new IOException("Error listing files in policies directory '" + policyParentDirPath
-						+ "' of domain '" + domainId + "'", e);
+				throw new IOException("Error listing files in policies directory '" + policyParentDirPath + "' of domain '" + domainId + "'", e);
 			}
 
 			return count;
@@ -2268,9 +2105,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		/**
 		 * Must be called within synchronized (domainDirPath) block
 		 * 
-		 * @return an example of current (p, v), such as p is a policy with a
-		 *         number of versions v > {@code maxAllowedVersionCount}; or
-		 *         null if all policies are OK (number of versions is lower or
+		 * @return an example of current (p, v), such as p is a policy with a number of versions v > {@code maxAllowedVersionCount}; or null if all policies are OK (number of versions is lower or
 		 *         equal).
 		 * @throws IOException
 		 */
@@ -2283,14 +2118,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 
 			/*
-			 * We could cache this, but this is meant to be used as a DAO in a
-			 * REST API, i.e. the API should be as stateless as possible.
-			 * Therefore, we should avoid caching when performance is not
-			 * critical (the performance-critical part is getPDP() only). Also
-			 * this should be in sync as much as possible with the filesystem.
+			 * We could cache this, but this is meant to be used as a DAO in a REST API, i.e. the API should be as stateless as possible. Therefore, we should avoid caching when performance is not
+			 * critical (the performance-critical part is getPDP() only). Also this should be in sync as much as possible with the filesystem.
 			 */
-			try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath,
-					FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
+			try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath, FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
 			{
 				for (final Path policyDirPath : policyParentDirStream)
 				{
@@ -2311,8 +2142,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 						}
 						catch (final IllegalArgumentException e)
 						{
-							throw new RuntimeException("Invalid policy directory name (bad encoding): " + policyDirName,
-									e);
+							throw new RuntimeException("Invalid policy directory name (bad encoding): " + policyDirName, e);
 						}
 
 						return new SimpleImmutableEntry<>(policyId, versionCount);
@@ -2321,8 +2151,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 			catch (final IOException e)
 			{
-				throw new IOException("Error listing files in policies directory '" + policyParentDirPath
-						+ "' of domain '" + domainId + "'", e);
+				throw new IOException("Error listing files in policies directory '" + policyParentDirPath + "' of domain '" + domainId + "'", e);
 			}
 
 			return null;
@@ -2332,17 +2161,13 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		public Set<String> getPolicyIDs() throws IOException
 		{
 			/*
-			 * We could cache this, but this is meant to be used as a DAO in a
-			 * REST API, i.e. the API should be as stateless as possible.
-			 * Therefore, we should avoid caching when performance is not
-			 * critical (the performance-critical part is getPDP() only). Also
-			 * this should be in sync as much as possible with the filesystem.
+			 * We could cache this, but this is meant to be used as a DAO in a REST API, i.e. the API should be as stateless as possible. Therefore, we should avoid caching when performance is not
+			 * critical (the performance-critical part is getPDP() only). Also this should be in sync as much as possible with the filesystem.
 			 */
 			final Set<String> policyIds = new TreeSet<>();
 			synchronized (domainDirPath)
 			{
-				try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath,
-						FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
+				try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirPath, FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
 				{
 					for (final Path policyDirPath : policyParentDirStream)
 					{
@@ -2360,8 +2185,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 						}
 						catch (final IllegalArgumentException e)
 						{
-							throw new RuntimeException("Invalid policy directory name (bad encoding): " + policyDirName,
-									e);
+							throw new RuntimeException("Invalid policy directory name (bad encoding): " + policyDirName, e);
 						}
 
 						policyIds.add(policyId);
@@ -2369,8 +2193,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				}
 				catch (final IOException e)
 				{
-					throw new IOException("Error listing files in policies directory '" + policyParentDirPath
-							+ "' of domain '" + domainId + "'", e);
+					throw new IOException("Error listing files in policies directory '" + policyParentDirPath + "' of domain '" + domainId + "'", e);
 				}
 
 				// make sure PDP is consistent/in sync with the info returned
@@ -2415,26 +2238,20 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 					// Wait a while for existing tasks to terminate
 					if (!dirToMemSyncScheduler.awaitTermination(SYNC_SERVICE_SHUTDOWN_TIMEOUT_SEC, TimeUnit.SECONDS))
 					{
-						LOGGER.error(
-								"Domain '{}': scheduler wait timeout ({}s) occurred before task could terminate after shutdown request.",
-								domainId, domainDirToMemSyncIntervalSec);
+						LOGGER.error("Domain '{}': scheduler wait timeout ({}s) occurred before task could terminate after shutdown request.", domainId, domainDirToMemSyncIntervalSec);
 						dirToMemSyncScheduler.shutdownNow(); // Cancel currently
 																// executing
 																// tasks
 						// Wait a while for tasks to respond to being cancelled
-						if (!dirToMemSyncScheduler.awaitTermination(SYNC_SERVICE_SHUTDOWN_TIMEOUT_SEC,
-								TimeUnit.SECONDS))
+						if (!dirToMemSyncScheduler.awaitTermination(SYNC_SERVICE_SHUTDOWN_TIMEOUT_SEC, TimeUnit.SECONDS))
 						{
-							LOGGER.error(
-									"Domain '{}': scheduler wait timeout ({}s) occurred before task could terminate after shudownNow request.",
-									domainId, domainDirToMemSyncIntervalSec);
+							LOGGER.error("Domain '{}': scheduler wait timeout ({}s) occurred before task could terminate after shudownNow request.", domainId, domainDirToMemSyncIntervalSec);
 						}
 					}
 				}
 				catch (final InterruptedException ie)
 				{
-					LOGGER.error("Domain '{}': scheduler interrupted while waiting for sync task to complete", domainId,
-							ie);
+					LOGGER.error("Domain '{}': scheduler interrupted while waiting for sync task to complete", domainId, ie);
 					// (Re-)Cancel if current thread also interrupted
 					dirToMemSyncScheduler.shutdownNow();
 					// Preserve interrupt status
@@ -2465,8 +2282,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		@Override
-		public PrpRWProperties setOtherPrpProperties(final PrpRWProperties props)
-				throws IOException, IllegalArgumentException
+		public PrpRWProperties setOtherPrpProperties(final PrpRWProperties props) throws IOException, IllegalArgumentException
 		{
 			if (props == null)
 			{
@@ -2483,8 +2299,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				// maxPolicyCount <= 0 considered unlimited
 				if (maxPolicyCount > 0 && maxPolicyCount < policyCount)
 				{
-					throw new IllegalArgumentException("Invalid maxPolicyCount (" + maxPolicyCount
-							+ "): < current policy count (" + policyCount + ")!");
+					throw new IllegalArgumentException("Invalid maxPolicyCount (" + maxPolicyCount + "): < current policy count (" + policyCount + ")!");
 				}
 
 				updatedProps.setMaxPolicyCount(maxPolicyCount > 0 ? BigInteger.valueOf(maxPolicyCount) : null);
@@ -2492,45 +2307,37 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				final int maxAllowedVersionCountPerPolicy = props.getMaxVersionCountPerPolicy();
 				// check that new maxAllowedVersionCount >= version count of any
 				// policy
-				final Entry<String, Integer> invalidPolicyVersion = checkPolicyVersionCount(
-						maxAllowedVersionCountPerPolicy);
+				final Entry<String, Integer> invalidPolicyVersion = checkPolicyVersionCount(maxAllowedVersionCountPerPolicy);
 				if (invalidPolicyVersion != null)
 				{
-					throw new IllegalArgumentException("Invalid maxVersionCount (" + maxAllowedVersionCountPerPolicy
-							+ "): < number of versions (" + invalidPolicyVersion.getValue() + ") of policy "
+					throw new IllegalArgumentException("Invalid maxVersionCount (" + maxAllowedVersionCountPerPolicy + "): < number of versions (" + invalidPolicyVersion.getValue() + ") of policy "
 							+ invalidPolicyVersion.getKey() + "!");
 				}
 
-				updatedProps.setMaxVersionCountPerPolicy(maxAllowedVersionCountPerPolicy > 0
-						? BigInteger.valueOf(maxAllowedVersionCountPerPolicy) : null);
+				updatedProps.setMaxVersionCountPerPolicy(maxAllowedVersionCountPerPolicy > 0 ? BigInteger.valueOf(maxAllowedVersionCountPerPolicy) : null);
 				updatedProps.setVersionRollingEnabled(props.isVersionRollingEnabled());
 				// validate and save new properties to disk
 				saveProperties(updatedProps);
 			}
 
-			return new PrpRWPropertiesImpl(props.getMaxPolicyCountPerDomain(), props.getMaxVersionCountPerPolicy(),
-					props.isVersionRollingEnabled());
+			return new PrpRWPropertiesImpl(props.getMaxPolicyCountPerDomain(), props.getMaxVersionCountPerPolicy(), props.isVersionRollingEnabled());
 		}
 
 	}
 
 	/**
-	 * Create domain DAO and register it in the map (incl. domainIDsByExternalId
-	 * if props != null && props.getExternalId() != null)
+	 * Create domain DAO and register it in the map (incl. domainIDsByExternalId if props != null && props.getExternalId() != null)
 	 * 
 	 * @param domainId
 	 * @param domainDirectory
 	 * @param props
-	 *            (optional), specific domain properties, or null if default or
-	 *            no properties should be used
+	 *            (optional), specific domain properties, or null if default or no properties should be used
 	 * @return domain DAO client
 	 * @throws IOException
 	 */
-	private DOMAIN_DAO_CLIENT addDomainToCacheAfterDirectoryCreated(final String domainId, final Path domainDirectory,
-			final WritableDomainProperties props) throws IOException
+	private DOMAIN_DAO_CLIENT addDomainToCacheAfterDirectoryCreated(final String domainId, final Path domainDirectory, final WritableDomainProperties props) throws IOException
 	{
-		final FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> domainDAO = new FileBasedDomainDAOImpl(
-				domainDirectory, props);
+		final FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> domainDAO = new FileBasedDomainDAOImpl(domainDirectory, props);
 		final DOMAIN_DAO_CLIENT domainDAOClient = domainDAOClientFactory.getInstance(domainId, domainDAO);
 		this.domainMap.put(domainId, domainDAOClient);
 
@@ -2552,45 +2359,29 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	 * Creates instance
 	 * 
 	 * @param domainsRoot
-	 *            root directory of the configuration data of security domains,
-	 *            one subdirectory per domain
+	 *            root directory of the configuration data of security domains, one subdirectory per domain
 	 * @param domainTmpl
-	 *            domain template directory; directories of new domains are
-	 *            created from this template
+	 *            domain template directory; directories of new domains are created from this template
 	 * @param domainsSyncIntervalSec
-	 *            how often (in seconds) the synchronization of managed domains
-	 *            (in memory) with the domain subdirectories in the
-	 *            <code>domainsRoot</code> directory (on disk) is done. If
-	 *            <code>domainSyncInterval</code> > 0, every
-	 *            <code>domainSyncInterval</code>, the managed domains (loaded
-	 *            in memory) are updated if any change has been detected in the
-	 *            <code>domainsRoot</code> directory in this interval (since
-	 *            last sync). To be more specific, <i>any change</i> here means
-	 *            any creation/deletion/modification of a domain folder
-	 *            (modification means: any file changed within the folder). If
-	 *            <code>domainSyncInterval</code> &lt;= 0, synchronization is
-	 *            disabled.
+	 *            how often (in seconds) the synchronization of managed domains (in memory) with the domain subdirectories in the <code>domainsRoot</code> directory (on disk) is done. If
+	 *            <code>domainSyncInterval</code> > 0, every <code>domainSyncInterval</code>, the managed domains (loaded in memory) are updated if any change has been detected in the
+	 *            <code>domainsRoot</code> directory in this interval (since last sync). To be more specific, <i>any change</i> here means any creation/deletion/modification of a domain folder
+	 *            (modification means: any file changed within the folder). If <code>domainSyncInterval</code> &lt;= 0, synchronization is disabled.
 	 * @param pdpModelHandler
 	 *            PDP configuration model handler
 	 * @param useRandomAddressBasedUUID
-	 *            true iff a random multicast address must be used as node field
-	 *            of generated UUIDs (Version 1), else the MAC address of one of
-	 *            the network interfaces is used. Setting this to 'true' is NOT
-	 *            recommended unless the host is disconnected from the network.
-	 *            These generated UUIDs are used for domain IDs.
+	 *            true iff a random multicast address must be used as node field of generated UUIDs (Version 1), else the MAC address of one of the network interfaces is used. Setting this to 'true'
+	 *            is NOT recommended unless the host is disconnected from the network. These generated UUIDs are used for domain IDs.
 	 * @param domainDAOClientFactory
 	 *            domain DAO client factory
 	 * @throws IOException
-	 *             I/O error occurred scanning existing domain folders in
-	 *             {@code domainsRoot} for loading.
+	 *             I/O error occurred scanning existing domain folders in {@code domainsRoot} for loading.
 	 */
-	@ConstructorProperties({ "domainsRoot", "domainTmpl", "domainsSyncIntervalSec", "pdpModelHandler",
-			"useRandomAddressBasedUUID", "domainDAOClientFactory" })
-	public FlatFileBasedDomainsDAO(final Resource domainsRoot, final Resource domainTmpl,
-			final int domainsSyncIntervalSec, final PdpModelHandler pdpModelHandler,
+	@ConstructorProperties({ "domainsRoot", "domainTmpl", "domainsSyncIntervalSec", "pdpModelHandler", "useRandomAddressBasedUUID", "domainDAOClientFactory" })
+	public FlatFileBasedDomainsDAO(final Resource domainsRoot, final Resource domainTmpl, final int domainsSyncIntervalSec, final PdpModelHandler pdpModelHandler,
 			final boolean useRandomAddressBasedUUID,
 			final DomainDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT, FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, DOMAIN_DAO_CLIENT> domainDAOClientFactory)
-					throws IOException
+			throws IOException
 	{
 		if (domainsRoot == null || domainTmpl == null || pdpModelHandler == null || domainDAOClientFactory == null)
 		{
@@ -2607,12 +2398,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		// Validate domainsRoot arg
 		if (!domainsRoot.exists())
 		{
-			throw new IllegalArgumentException(
-					"'domainsRoot' resource does not exist: " + domainsRoot.getDescription());
+			throw new IllegalArgumentException("'domainsRoot' resource does not exist: " + domainsRoot.getDescription());
 		}
 
-		final String ioExMsg = "Cannot resolve 'domainsRoot' resource '" + domainsRoot.getDescription()
-				+ "' as a file on the file system";
+		final String ioExMsg = "Cannot resolve 'domainsRoot' resource '" + domainsRoot.getDescription() + "' as a file on the file system";
 		File domainsRootFile = null;
 		try
 		{
@@ -2624,8 +2413,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		this.domainsRootDir = domainsRootFile.toPath();
-		FlatFileDAOUtils.checkFile("File defined by SecurityDomainManager parameter 'domainsRoot'", domainsRootDir,
-				true, true);
+		FlatFileDAOUtils.checkFile("File defined by SecurityDomainManager parameter 'domainsRoot'", domainsRootDir, true, true);
 
 		// Validate domainTmpl directory arg
 		if (!domainTmpl.exists())
@@ -2633,8 +2421,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			throw new IllegalArgumentException("'domainTmpl' resource does not exist: " + domainTmpl.getDescription());
 		}
 
-		final String ioExMsg2 = "Cannot resolve 'domainTmpl' resource '" + domainTmpl.getDescription()
-				+ "' as a file on the file system";
+		final String ioExMsg2 = "Cannot resolve 'domainTmpl' resource '" + domainTmpl.getDescription() + "' as a file on the file system";
 		File domainTmplFile = null;
 		try
 		{
@@ -2646,8 +2433,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		this.domainTmplDirPath = domainTmplFile.toPath();
-		FlatFileDAOUtils.checkFile("File defined by SecurityDomainManager parameter 'domainTmpl'", domainTmplDirPath,
-				true, false);
+		FlatFileDAOUtils.checkFile("File defined by SecurityDomainManager parameter 'domainTmpl'", domainTmplDirPath, true, false);
 
 		LOGGER.debug("Looking for domain sub-directories in directory {}", domainsRootDir);
 		try (final DirectoryStream<Path> dirStream = Files.newDirectoryStream(domainsRootDir))
@@ -2685,16 +2471,14 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 		catch (final IOException e)
 		{
-			throw new IOException("Failed to scan files in the domains root directory '" + domainsRootDir
-					+ "' looking for domain directories", e);
+			throw new IOException("Failed to scan files in the domains root directory '" + domainsRootDir + "' looking for domain directories", e);
 		}
 
 		this.domainDirToMemSyncIntervalSec = Integer.valueOf(domainsSyncIntervalSec).longValue();
 	}
 
 	/**
-	 * Close domains, i.e. PDPs, sync threads (to be called by Spring when
-	 * application stopped)
+	 * Close domains, i.e. PDPs, sync threads (to be called by Spring when application stopped)
 	 */
 	public void closeDomains()
 	{
@@ -2726,13 +2510,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		if (domain == null)
 		{
 			/*
-			 * check whether domain directory exists (in case it is not
-			 * synchronized with domain map
+			 * check whether domain directory exists (in case it is not synchronized with domain map
 			 */
 			final Path domainDir = this.domainsRootDir.resolve(domainId);
 			/*
-			 * Synchronized block two avoid that two threads adding the same
-			 * desynced domain entry to the map
+			 * Synchronized block two avoid that two threads adding the same desynced domain entry to the map
 			 */
 			synchronized (domainsRootDir)
 			{
@@ -2751,10 +2533,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	{
 		final UUID uuid = uuidGen.generate();
 		/*
-		 * Encode UUID with Base64url to have shorter IDs in REST API URL paths
-		 * and to be compatible with filenames on any operating system, since
-		 * the resulting domain ID is used as name for the directory where all
-		 * the domain's data will be stored.
+		 * Encode UUID with Base64url to have shorter IDs in REST API URL paths and to be compatible with filenames on any operating system, since the resulting domain ID is used as name for the
+		 * directory where all the domain's data will be stored.
 		 */
 		final ByteBuffer byteBuf = ByteBuffer.wrap(new byte[16]);
 		byteBuf.putLong(uuid.getMostSignificantBits());
@@ -2767,17 +2547,15 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			// know.
 			if (this.domainMap.containsKey(domainId))
 			{
-				throw new ConcurrentModificationException(
-						"Generated domain ID conflicts (is same as) ID of existing domain (flawed domain UUID generator or ID generated in different way?): ID="
-								+ domainId);
+				throw new ConcurrentModificationException("Generated domain ID conflicts (is same as) ID of existing domain (flawed domain UUID generator or ID generated in different way?): ID="
+						+ domainId);
 			}
 
 			final Path domainDir = this.domainsRootDir.resolve(domainId);
 			if (Files.notExists(domainDir))
 			{
 				/*
-				 * Create/initialize new domain directory from domain template
-				 * directory
+				 * Create/initialize new domain directory from domain template directory
 				 */
 				FlatFileDAOUtils.copyDirectory(this.domainTmplDirPath, domainDir, 3);
 			}
@@ -2817,10 +2595,8 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 			// externalId == null
 			/*
-			 * All changes to domainMap are synchronized by 'domainsRootDir'. So
-			 * we can iterate and change if necessary for synchronizing the
-			 * domains root directory with the domainMap (Using a domainMap is
-			 * necessary for quick access to domains' PDPs.)
+			 * All changes to domainMap are synchronized by 'domainsRootDir'. So we can iterate and change if necessary for synchronizing the domains root directory with the domainMap (Using a
+			 * domainMap is necessary for quick access to domains' PDPs.)
 			 */
 			final Set<String> oldDomainIDs = new HashSet<>(domainMap.keySet());
 			final Set<String> newDomainIDs = new HashSet<>();
@@ -2863,8 +2639,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 			catch (final IOException e)
 			{
-				throw new IOException("Failed to scan files in the domains root directory '" + domainsRootDir
-						+ "' looking for domain directories", e);
+				throw new IOException("Failed to scan files in the domains root directory '" + domainsRootDir + "' looking for domain directories", e);
 			}
 
 			if (!oldDomainIDs.isEmpty())
@@ -2897,13 +2672,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/*
-		 * check whether domain directory exists (in case it is not synchronized
-		 * with domain map
+		 * check whether domain directory exists (in case it is not synchronized with domain map
 		 */
 		final Path domainDir = this.domainsRootDir.resolve(domainId);
 		/*
-		 * Synchronized block two avoid that two threads adding the same
-		 * desynced domain entry to the map
+		 * Synchronized block two avoid that two threads adding the same desynced domain entry to the map
 		 */
 		synchronized (domainsRootDir)
 		{
