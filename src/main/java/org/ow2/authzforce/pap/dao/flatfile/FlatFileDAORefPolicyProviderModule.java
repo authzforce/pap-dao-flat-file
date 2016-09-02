@@ -50,7 +50,7 @@ import org.ow2.authzforce.core.pdp.api.policy.TopLevelPolicyElementEvaluator;
 import org.ow2.authzforce.core.pdp.api.policy.TopLevelPolicyElementType;
 import org.ow2.authzforce.core.pdp.api.policy.VersionPatterns;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluators;
-import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
+import org.ow2.authzforce.core.pdp.impl.policy.PolicyMap;
 import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
 import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDAORefPolicyProvider;
 import org.springframework.util.ResourceUtils;
@@ -258,7 +258,7 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 	private final CombiningAlgRegistry combiningAlgRegistry;
 	private final int maxPolicyRefDepth;
 	// policyId -> cache(PolicySets by policy version)
-	private final Map<String, PolicyVersions<PolicyEvaluatorSupplier>> policyCache;
+	private final PolicyMap<PolicyEvaluatorSupplier> policyCache;
 
 	private FlatFileDAORefPolicyProviderModule(final Path policyParentDirectory, final String suffix,
 			final XACMLParserFactory xacmlParserFactory, final ExpressionFactory expressionFactory,
@@ -271,7 +271,7 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 		assert combiningAlgRegistry != null;
 
 		FlatFileDAOUtils.checkFile("RefPolicyProvider's policy directory", policyParentDirectory, true, false);
-		final Map<String, PolicyVersions<PolicyEvaluatorSupplier>> updatablePolicyMap = HashObjObjMaps
+		final Map<String, Map<PolicyVersion, PolicyEvaluatorSupplier>> updatablePolicyMap = HashObjObjMaps
 				.newUpdatableMap();
 		// filter matching specifc file suffix for policy files
 		final Filter<? super Path> policyFilenameSuffixMatchingDirStreamFilter = new SuffixMatchingDirectoryStreamFilter(
@@ -331,9 +331,7 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 							+ "' in directory: " + policyParentDirectory, e);
 				}
 
-				final PolicyVersions<PolicyEvaluatorSupplier> versions = new PolicyVersions<>(
-						policySetSuppliersByVersion);
-				updatablePolicyMap.put(policyId, versions);
+				updatablePolicyMap.put(policyId, policySetSuppliersByVersion);
 			}
 		}
 		catch (final IOException e)
@@ -342,7 +340,7 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 					"Error listing files in policies parent directory '" + policyParentDirectory, e);
 		}
 
-		this.policyCache = HashObjObjMaps.newImmutableMap(updatablePolicyMap);
+		this.policyCache = new PolicyMap<>(updatablePolicyMap);
 		this.xacmlParserFactory = xacmlParserFactory;
 		this.expressionFactory = expressionFactory;
 		this.combiningAlgRegistry = combiningAlgRegistry;
@@ -363,8 +361,7 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 				Collections.singletonList(id), maxPolicyRefDepth);
 
 		// Request for PolicySetEvaluator (from PolicySetIdReference)
-		final PolicyVersions<PolicyEvaluatorSupplier> policyVersions = policyCache.get(id);
-		final Entry<PolicyVersion, PolicyEvaluatorSupplier> policyEntry = policyVersions.getLatest(versionPatterns);
+		final Entry<PolicyVersion, PolicyEvaluatorSupplier> policyEntry = policyCache.get(id, versionPatterns);
 		if (policyEntry == null)
 		{
 			return null;
@@ -421,8 +418,11 @@ public final class FlatFileDAORefPolicyProviderModule implements StaticRefPolicy
 	@Override
 	public void close() throws IOException
 	{
-		this.policyCache.clear();
-
+		/*
+		 * The policyCache has been made immutable so we cannot call the clear()
+		 * method
+		 */
+		// this.policyCache.clear();
 	}
 
 }
