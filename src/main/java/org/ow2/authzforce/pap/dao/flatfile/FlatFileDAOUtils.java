@@ -19,6 +19,8 @@
 package org.ow2.authzforce.pap.dao.flatfile;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
@@ -31,9 +33,24 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collections;
+import java.util.Map;
+import java.util.Map.Entry;
 
+import javax.xml.bind.JAXBException;
+
+import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
+
+import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils;
+import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
+import org.ow2.authzforce.core.pdp.api.XMLUtils.NoNamespaceFilteringParser;
+import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
+import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
+
+import com.google.common.base.Preconditions;
 import com.google.common.io.BaseEncoding;
+import com.koloboke.collect.map.hash.HashObjObjMaps;
 
 /**
  * Utility methods
@@ -53,7 +70,7 @@ public final class FlatFileDAOUtils
 	 *            input
 	 * @return encoded result
 	 */
-	public static String base64UrlEncode(byte[] bytes)
+	public static String base64UrlEncode(final byte[] bytes)
 	{
 		return BASE64URL_NO_PADDING_ENCODING.encode(bytes);
 	}
@@ -65,7 +82,7 @@ public final class FlatFileDAOUtils
 	 *            input
 	 * @return encoded result
 	 */
-	public static String base64UrlEncode(String input)
+	public static String base64UrlEncode(final String input)
 	{
 		return BASE64URL_NO_PADDING_ENCODING.encode(input.getBytes(StandardCharsets.UTF_8));
 	}
@@ -79,13 +96,35 @@ public final class FlatFileDAOUtils
 	 * @throws IllegalArgumentException
 	 *             if the input is not a valid encoded string according to base64url encoding without padding
 	 */
-	public static String base64UrlDecode(String encoded) throws IllegalArgumentException
+	public static String base64UrlDecode(final String encoded) throws IllegalArgumentException
 	{
 		return new String(BASE64URL_NO_PADDING_ENCODING.decode(encoded), StandardCharsets.UTF_8);
 	}
 
-	private FlatFileDAOUtils()
+	/**
+	 * Get part of filename before given suffix
+	 * 
+	 * @param file
+	 *            path
+	 * @param filenameSuffixLength
+	 *            length of the suffix
+	 * @return prefix
+	 * @throws IllegalArgumentException
+	 *             file has no filename (probably root of filesystem)
+	 */
+	public static String getPrefix(final Path file, final int filenameSuffixLength) throws IllegalArgumentException
 	{
+		assert file != null;
+
+		final Path fileName = file.getFileName();
+		if (fileName == null)
+		{
+			throw new IllegalArgumentException("Invalid file (no filename, probably root?): " + file);
+		}
+
+		final String filename = fileName.toString();
+		return filename.substring(0, filename.length() - filenameSuffixLength);
+
 	}
 
 	/**
@@ -102,7 +141,7 @@ public final class FlatFileDAOUtils
 	 * @throws IllegalArgumentException
 	 *             if {@code file == null || !file.exists() || !file.canRead() || (isdirectory && !file.isDirectory()) || (!isdirectory && file.isDirectory()) || (canwrite && !file.canWrite())}
 	 */
-	public static void checkFile(String friendlyname, Path file, boolean isdirectory, boolean canwrite) throws IllegalArgumentException
+	public static void checkFile(final String friendlyname, final Path file, final boolean isdirectory, final boolean canwrite) throws IllegalArgumentException
 	{
 		if (file == null)
 		{
@@ -133,12 +172,27 @@ public final class FlatFileDAOUtils
 	}
 
 	/**
+	 * Directory entry filter that accepts only sub-directories
+	 *
+	 */
+	public static final DirectoryStream.Filter<Path> SUB_DIRECTORY_STREAM_FILTER = new DirectoryStream.Filter<Path>()
+	{
+
+		@Override
+		public boolean accept(final Path entry) throws IOException
+		{
+			return Files.isDirectory(entry);
+		}
+	};
+
+	/**
 	 * Directory entry filter that accepts only regular files with a given extension/suffix
 	 *
 	 */
 	public static final class SuffixMatchingDirectoryStreamFilter implements DirectoryStream.Filter<Path>
 	{
 		private final PathMatcher pathSuffixMatcher;
+		private final String pathSuffix;
 
 		/**
 		 * Creates filter from a filename extension/suffix
@@ -146,16 +200,26 @@ public final class FlatFileDAOUtils
 		 * @param suffix
 		 *            filename suffix to be matched
 		 */
-		public SuffixMatchingDirectoryStreamFilter(String suffix)
+		public SuffixMatchingDirectoryStreamFilter(final String suffix)
 		{
+			this.pathSuffix = suffix;
 			this.pathSuffixMatcher = FileSystems.getDefault().getPathMatcher("glob:*" + suffix);
 		}
 
-		@Override
-		public boolean accept(Path entry) throws IOException
+		/**
+		 * Get the filename suffix used for filtering
+		 * 
+		 * @return the matched filename suffix
+		 */
+		public String getMatchedSuffix()
 		{
-			final boolean isAccepted = Files.isRegularFile(entry) && Files.isReadable(entry) && pathSuffixMatcher.matches(entry.getFileName());
-			return isAccepted;
+			return this.pathSuffix;
+		}
+
+		@Override
+		public boolean accept(final Path entry) throws IOException
+		{
+			return Files.isRegularFile(entry) && pathSuffixMatcher.matches(entry.getFileName());
 		}
 	}
 
@@ -165,27 +229,28 @@ public final class FlatFileDAOUtils
 		private final Path source;
 		private final Path target;
 
-		private CopyingFileVisitor(Path source, Path target)
+		private CopyingFileVisitor(final Path source, final Path target)
 		{
 			this.source = source;
 			this.target = target;
 		}
 
 		@Override
-		public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException
+		public FileVisitResult visitFile(final Path file, final BasicFileAttributes attributes) throws IOException
 		{
 			Files.copy(file, target.resolve(source.relativize(file)));
 			return FileVisitResult.CONTINUE;
 		}
 
 		@Override
-		public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException
+		public FileVisitResult preVisitDirectory(final Path directory, final BasicFileAttributes attributes) throws IOException
 		{
 			final Path targetDirectory = target.resolve(source.relativize(directory));
 			try
 			{
 				Files.copy(directory, targetDirectory);
-			} catch (FileAlreadyExistsException e)
+			}
+			catch (final FileAlreadyExistsException e)
 			{
 				if (!Files.isDirectory(targetDirectory))
 				{
@@ -199,7 +264,7 @@ public final class FlatFileDAOUtils
 	private static FileVisitor<Path> DELETING_FILE_VISITOR = new SimpleFileVisitor<Path>()
 	{
 		@Override
-		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException
+		public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) throws IOException
 		{
 			if (attrs.isRegularFile())
 			{
@@ -210,7 +275,7 @@ public final class FlatFileDAOUtils
 		}
 
 		@Override
-		public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException
+		public FileVisitResult postVisitDirectory(final Path dir, final IOException exc) throws IOException
 		{
 
 			if (exc == null)
@@ -239,7 +304,7 @@ public final class FlatFileDAOUtils
 	 * @throws IOException
 	 *             file copy error
 	 */
-	public static void copyDirectory(Path source, Path target, int maxDepth) throws IOException, IllegalArgumentException
+	public static void copyDirectory(final Path source, final Path target, final int maxDepth) throws IOException, IllegalArgumentException
 	{
 		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(), maxDepth, new CopyingFileVisitor(source, target));
 	}
@@ -258,9 +323,167 @@ public final class FlatFileDAOUtils
 	 * @throws IOException
 	 *             file deletion error
 	 */
-	public static void deleteDirectory(Path dir, int maxDepth) throws IOException, IllegalArgumentException
+	public static void deleteDirectory(final Path dir, final int maxDepth) throws IOException, IllegalArgumentException
 	{
 		Files.walkFileTree(dir, Collections.<FileVisitOption> emptySet(), maxDepth, DELETING_FILE_VISITOR);
+	}
+
+	/**
+	 * Get/load policy from file
+	 * 
+	 * @param policyFilepath
+	 *            policy file
+	 * @param xacmlParser
+	 *            XACML parser; or null if the default should be used (same as {@link #loadPolicy(Path)})
+	 * @return JAXB-annotated XACML PolicySet
+	 * @throws IllegalArgumentException
+	 *             if {@code policyFilepath} does not exist or the file content is not a PolicySet
+	 * @throws JAXBException
+	 *             error parsing XACML policy file into JAXB PolicySet
+	 */
+	public static PolicySet loadPolicy(final Path policyFilepath, final NamespaceFilteringParser xacmlParser) throws IllegalArgumentException, JAXBException
+	{
+		final URL policyURL;
+		try
+		{
+			policyURL = Preconditions.checkNotNull(policyFilepath, "Undefined policyFilepath").toUri().toURL();
+		}
+		catch (final MalformedURLException e)
+		{
+			throw new IllegalArgumentException("Failed to locate policy file: " + policyFilepath, e);
+		}
+
+		final NamespaceFilteringParser nonNullXacmlParser = xacmlParser == null ? new NoNamespaceFilteringParser(JaxbXACMLUtils.createXacml3Unmarshaller()) : xacmlParser;
+		final Object jaxbPolicyOrPolicySetObj;
+		try
+		{
+			jaxbPolicyOrPolicySetObj = nonNullXacmlParser.parse(policyURL);
+		}
+		catch (final JAXBException e)
+		{
+			throw new JAXBException("Failed to unmarshall Policy(Set) XML document from policy location: " + policyURL, e);
+		}
+
+		/*
+		 * If jaxbPolicyOrPolicySetObj == null, instanceof returns false, so the exception is thrown
+		 */
+		if (!(jaxbPolicyOrPolicySetObj instanceof PolicySet))
+		{
+			throw new IllegalArgumentException("Unexpected/unsupported element found as root of the XML document at policy location '" + policyURL + "': "
+					+ jaxbPolicyOrPolicySetObj.getClass().getSimpleName());
+
+		}
+
+		return (PolicySet) jaxbPolicyOrPolicySetObj;
+	}
+
+	/**
+	 * Get/load policy from file
+	 * 
+	 * @param policyFilepath
+	 *            policy file
+	 * @return JAXB-annotated XACML PolicySet
+	 * @throws IllegalArgumentException
+	 *             if {@code policyFilepath} does not exist or the file content is not a PolicySet
+	 * @throws JAXBException
+	 *             error parsing XACML policy file into JAXB PolicySet
+	 */
+	public static PolicySet loadPolicy(final Path policyFilepath) throws IllegalArgumentException, JAXBException
+	{
+		return loadPolicy(policyFilepath, null);
+	}
+
+	/**
+	 * Get latest version and corresponding file path of a Policy(Set) document in a directory where each file is named '${version}suffix' representing a specific XACML Policy(Set) Version
+	 * (${version}) of this document
+	 * 
+	 * @param versionsDirectory
+	 *            directory containing the Policy(Set) version files
+	 * @param filenameSuffixMatchingFilter
+	 *            file filter that accepts only policy filenames with a specific suffix (e.g. '.xml')
+	 * @return latest version
+	 * @throws IOException
+	 *             error Error listing files in {@code versionsDirectory}
+	 * @throws NullPointerException
+	 *             if {@code versionsDirectory == null}
+	 */
+	public static Entry<PolicyVersion, Path> getLatestPolicyVersion(final Path versionsDirectory, final SuffixMatchingDirectoryStreamFilter filenameSuffixMatchingFilter) throws IOException
+	{
+		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(Preconditions.checkNotNull(versionsDirectory, "Undefined versionsDirectory"),
+				Preconditions.checkNotNull(filenameSuffixMatchingFilter, "Undefined filenameSuffixMatchingFilter")))
+		{
+			PolicyVersion latestVersion = null;
+			Path latestFilepath = null;
+			for (final Path policyVersionFilePath : policyDirStream)
+			{
+				final Path policyVersionFileName = policyVersionFilePath.getFileName();
+				if (policyVersionFileName == null)
+				{
+					throw new IOException("Invalid policy file path: " + policyVersionFilePath);
+				}
+
+				final String versionPlusSuffix = policyVersionFileName.toString();
+				final String versionId = versionPlusSuffix.substring(0, versionPlusSuffix.length() - filenameSuffixMatchingFilter.pathSuffix.length());
+				final PolicyVersion version = new PolicyVersion(versionId);
+				if (latestVersion == null || latestVersion.compareTo(version) < 0)
+				{
+					latestVersion = version;
+					latestFilepath = policyVersionFilePath;
+				}
+			}
+			return new SimpleImmutableEntry<>(latestVersion, latestFilepath);
+		}
+		catch (final IOException e)
+		{
+			throw e;
+		}
+	}
+
+	/**
+	 * Get versions of a Policy(Set) document, sorted from latest to oldest, from a directory where each file is named '${version}suffix' representing a specific XACML Policy(Set) Version (${version})
+	 * of this document
+	 * 
+	 * @param versionsDirectory
+	 *            directory containing the Policy(Set) version files
+	 * @param filenameSuffixMatchingFilter
+	 *            file filter that accepts only policy filenames with a specific suffix (e.g. '.xml'); if null, no filtering
+	 * @return versions sorted from latest to oldest
+	 * @throws IOException
+	 *             error Error listing files in {@code versionsDirectory}
+	 * @throws NullPointerException
+	 *             if {@code versionsDirectory == null}
+	 */
+	public static PolicyVersions<Path> getPolicyVersions(final Path versionsDirectory, final SuffixMatchingDirectoryStreamFilter filenameSuffixMatchingFilter) throws IOException
+	{
+		Preconditions.checkNotNull(versionsDirectory, "Undefined versionsDirectory");
+		Preconditions.checkNotNull(versionsDirectory, "Undefined filenameSuffixMatchingFilter");
+		final Map<PolicyVersion, Path> versions = HashObjObjMaps.newUpdatableMap();
+		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(versionsDirectory, filenameSuffixMatchingFilter))
+		{
+			for (final Path policyVersionFilePath : policyDirStream)
+			{
+				final Path policyVersionFileName = policyVersionFilePath.getFileName();
+				if (policyVersionFileName == null)
+				{
+					throw new IOException("Invalid policy file path: " + policyVersionFilePath);
+				}
+
+				final String versionPlusSuffix = policyVersionFileName.toString();
+				final String versionId = versionPlusSuffix.substring(0, versionPlusSuffix.length() - filenameSuffixMatchingFilter.pathSuffix.length());
+				final PolicyVersion version = new PolicyVersion(versionId);
+				versions.put(version, policyVersionFilePath);
+			}
+		}
+		catch (final IOException e)
+		{
+			throw e;
+		}
+
+		return new PolicyVersions<>(versions);
+	}
+
+	private FlatFileDAOUtils()
+	{
 	}
 
 	// public static void main(String[] args)
@@ -269,7 +492,7 @@ public final class FlatFileDAOUtils
 	// // String input = "mailto:herong_yang@yahoo.com";
 	//
 	// System.out.println("input: " + input);
-	// // FIXME: instead of google BaseEncoding, use
+	// // NB: instead of google BaseEncoding, use
 	// java.util.Base64.getURLEncoder() when moving to Java 8
 	// final String encodedId =
 	// BaseEncoding.base64Url().omitPadding().encode(input.getBytes(StandardCharsets.UTF_8));
