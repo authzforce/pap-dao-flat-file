@@ -3,22 +3,25 @@ All notable changes to this project are documented in this file following the [K
 
 # Unreleased
 ### Fixed
-- #22 (OW2): When handling the same XACML Request twice in the same JVM with the root PolicySet using deny-unless-permit algorithm over a Policy returning simple Deny (no status/obligation/advice) and a Policy returning Permit/Deny with obligations/advice, the obligation is duplicated in the final result at the second time this situation occurs. 
-- XACML StatusCode XML serialization/marshalling error when Missing Attribute info that is no valid anyURI is returned by PDP in a Indeterminate Result
 - Other issues reported by Codacy
-
-### Removed
-- 'functionSet' element no longer supported in PDP XML configuration schema
 
 ### Changed
 - Parent project version: authzforce-ce-parent: 3.4.0
-- Dependency version (PAP API): authzforce-ce-core-pap-api: ???
-- Dependency version (PDP core engine): authzforce-ce-core: ???:
-- Interpretation of XACML Request flag ReturnPolicyId=true, considering a policy "applicable" if and only if the decision is not NotApplicable and if it is not a root policy, the same goes for the enclosing policy. See also the discussion on the xacml-comment mailing list: https://lists.oasis-open.org/archives/xacml-comment/201605/msg00004.html
-- AttributeProvider module API: new environmentProperties parameter in factories, allowing module configurations to use global Environment properties like PARENT_DIR variable
+- Dependency version (PAP API): authzforce-ce-core-pap-api: 5.3.0
+- Dependency version (PDP core engine): authzforce-ce-core: 5.0.2, with the following changes:
+  - Supported PDP XML configuration (file 'pdp.xml') schema namespace: http://authzforce.github.io/core/xmlns/pdp/5.0 (previous namespace: http://authzforce.github.io/core/xmlns/pdp/3.6).
+  - Fixed issue #22 (OW2): When handling the same XACML Request twice in the same JVM with the root PolicySet using deny-unless-permit algorithm over a Policy returning simple Deny (no status/obligation/advice) and a Policy returning Permit/Deny with obligations/advice, the obligation is duplicated in the final result at the second time this situation occurs. 
+  - Fixed XACML StatusCode XML serialization/marshalling error when Missing Attribute info that is no valid anyURI is returned by PDP in a Indeterminate Result
+  - Fixed memory management issue: native RootPolicyProvider modules keeping a reference to static refPolicyProvider, even after policies have been resolved statically at initialization time, preventing garbage collection and memory saving.
+  - Interpretation of XACML Request flag ReturnPolicyId=true, considering a policy "applicable" if and only if the decision is not NotApplicable and if it is not a root policy, the same goes for the enclosing policy. See also the discussion on the xacml-comment mailing list: https://lists.oasis-open.org/archives/xacml-comment/201605/msg00004.html
+  - AttributeProvider module API: new environmentProperties parameter in factories, allowing module configurations to use global Environment properties like PARENT_DIR variable
+  - 'functionSet' element no longer supported in PDP XML configuration file 'pdp.xml'
+  - New PDP configuration parameters supported in 'pdp.xml' file:  
+    - 'standardEnvAttributeSource' (enum) sets the source for the Standard Current Time Environment Attribute values (current-date, current-time, current-dateTime): PDP_ONLY, REQUEST_ELSE_PDP, REQUEST_ONLY
+    - 'badRequestStatusDetailLevel' (positive integer) sets the level of detail of the error message in StatusDetail returned in Indeterminate Results in case of bad Requests
+
 
 ### Added
-- New feature enabled by PDP configuration parameter:  enum 'standardEnvAttributeSource' to set the source for the Standard Current Time Environment Attribute values (current-date, current-time, current-dateTime): PDP_ONLY, REQUEST_ELSE_PDP, REQUEST_ONLY
 - New methods in FlatFileDAOUtils class:
 	- getPolicyVersions(Path): to get policy versions from a policy directory
 	- Entry<PolicyVersion, Path> getLatestPolicyVersion(Path) to get latest version from a policy directory with path to corresponding policy file
