@@ -1,7 +1,7 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
-# Unreleased
+# 6.1.0
 ### Fixed
 - Other issues reported by Codacy
 
@@ -19,7 +19,6 @@ All notable changes to this project are documented in this file following the [K
   - New PDP configuration parameters supported in 'pdp.xml' file:  
     - 'standardEnvAttributeSource' (enum) sets the source for the Standard Current Time Environment Attribute values (current-date, current-time, current-dateTime): PDP_ONLY, REQUEST_ELSE_PDP, REQUEST_ONLY
     - 'badRequestStatusDetailLevel' (positive integer) sets the level of detail of the error message in StatusDetail returned in Indeterminate Results in case of bad Requests
-
 
 ### Added
 - New methods in FlatFileDAOUtils class:
