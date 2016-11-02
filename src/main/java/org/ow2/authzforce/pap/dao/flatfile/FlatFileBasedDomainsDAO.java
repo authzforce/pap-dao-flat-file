@@ -1151,10 +1151,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				throw NON_STATIC_POLICY_EXCEPTION;
 			}
 
-			final List<IdReferenceType> staticPolicyRefs = new ArrayList<>();
+			final Map<String, PolicyVersion> refPolicySets = pdpApplicablePolicies.rootPolicyExtraMetadata().getRefPolicySets();
+			final List<IdReferenceType> staticPolicyRefs = new ArrayList<>(1 + refPolicySets.size());
 			final IdReferenceType staticRootPolicyRef = new IdReferenceType(pdpApplicablePolicies.rootPolicyId(), pdpApplicablePolicies.rootPolicyExtraMetadata().getVersion().toString(), null, null);
 			staticPolicyRefs.add(staticRootPolicyRef);
-			for (final Entry<String, PolicyVersion> enabledPolicyEntry : pdpApplicablePolicies.rootPolicyExtraMetadata().getRefPolicySets().entrySet())
+			for (final Entry<String, PolicyVersion> enabledPolicyEntry : refPolicySets.entrySet())
 			{
 				staticPolicyRefs.add(new IdReferenceType(enabledPolicyEntry.getKey(), enabledPolicyEntry.getValue().toString(), null, null));
 			}
