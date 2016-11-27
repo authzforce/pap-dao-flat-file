@@ -166,6 +166,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	private static final IllegalArgumentException NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null domain PDP properties arg");
 	private static final IllegalArgumentException NULL_ROOT_POLICY_REF_ARGUMENT_EXCEPTION = new IllegalArgumentException("Invalid domain PDP properties arg: rootPolicyRef undefined");
 	private static final IllegalArgumentException NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null attributeProviders arg");
+	private static final UnsupportedOperationException DISABLED_OPERATION_EXCEPTION = new UnsupportedOperationException("Unsupported operation: disabled by configuration");
 
 	private static final PolicyVersions<Path> EMPTY_POLICY_VERSIONS = new PolicyVersions<>(Collections.<PolicyVersion, Path> emptyMap());
 
@@ -537,7 +538,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	private final long domainDirToMemSyncIntervalSec;
 
 	private final DomainDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT, FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, DOMAIN_DAO_CLIENT> domainDAOClientFactory;
+
+	private final boolean enablePdpOnly;
+
 	private final PolicyDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> policyDAOClientFactory;
+
 	private final PolicyVersionDAOClient.Factory<VERSION_DAO_CLIENT> policyVersionDAOClientFactory;
 
 	/**
@@ -942,6 +947,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public ReadableDomainProperties setDomainProperties(final WritableDomainProperties props) throws IOException, IllegalArgumentException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (props == null)
 			{
 				throw NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION;
@@ -994,6 +1004,10 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public ReadableDomainProperties getDomainProperties() throws IOException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
 
 			final DomainProperties props;
 			synchronized (domainDirPath)
@@ -1241,6 +1255,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public ReadablePdpProperties setOtherPdpProperties(final WritablePdpProperties properties) throws IOException, IllegalArgumentException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (properties == null)
 			{
 				throw NULL_PDP_PROPERTIES_ARGUMENT_EXCEPTION;
@@ -1405,6 +1424,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public ReadablePdpProperties getOtherPdpProperties() throws IOException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			final AbstractPolicyProvider rootPolicyProvider;
 			synchronized (domainDirPath)
 			{
@@ -1469,6 +1493,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public List<AbstractAttributeProvider> setAttributeProviders(final List<AbstractAttributeProvider> attributeproviders) throws IOException, IllegalArgumentException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (attributeproviders == null)
 			{
 				throw NULL_ATTRIBUTE_PROVIDERS_ARGUMENT_EXCEPTION;
@@ -1491,8 +1520,14 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public List<AbstractAttributeProvider> getAttributeProviders() throws IOException
 		{
-			// Synchronize changes on PDP (and other domain conf data) from
-			// multiple threads, keep minimal things in the synchronized block
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
+			/*
+			 * Synchronize changes on PDP (and other domain conf data) from multiple threads, keep minimal things in the synchronized block
+			 */
 			final Pdp pdpConf;
 			synchronized (domainDirPath)
 			{
@@ -1563,6 +1598,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public PolicySet addPolicy(final PolicySet policySet) throws IOException, IllegalArgumentException, TooManyPoliciesException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (policySet == null)
 			{
 				throw NULL_POLICY_ARGUMENT_EXCEPTION;
@@ -1759,6 +1799,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public PolicySet getPolicyVersion(final String policyId, final PolicyVersion version) throws IOException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (policyId == null || version == null)
 			{
 				return null;
@@ -1828,6 +1873,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public PolicySet removePolicyVersion(final String policyId, final PolicyVersion version) throws IOException, IllegalArgumentException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (policyId == null || version == null)
 			{
 				return null;
@@ -1873,6 +1923,14 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public VERSION_DAO_CLIENT getVersionDAOClient(final String policyId, final PolicyVersion version)
 		{
+			/*
+			 * policyVersionDAOClientFactory == null iff enablePdpOnly (see constructor)
+			 */
+			if (policyVersionDAOClientFactory == null)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (policyId == null || version == null)
 			{
 				return null;
@@ -1884,6 +1942,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public PolicyVersion getLatestPolicyVersionId(final String policyId) throws IOException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (policyId == null)
 			{
 				return null;
@@ -1986,6 +2049,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public NavigableSet<PolicyVersion> getPolicyVersions(final String policyId) throws IOException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (policyId == null)
 			{
 				return ImmutableSortedSet.of();
@@ -2011,6 +2079,14 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public POLICY_DAO_CLIENT getPolicyDAOClient(final String policyId)
 		{
+			/*
+			 * policyDAOClientFactory == null iff enablePdpOnly (see constructor)
+			 */
+			if (policyDAOClientFactory == null)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (policyId == null)
 			{
 				return null;
@@ -2022,6 +2098,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public NavigableSet<PolicyVersion> removePolicy(final String policyId) throws IOException, IllegalArgumentException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (policyId == null)
 			{
 				return ImmutableSortedSet.of();
@@ -2144,6 +2225,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public Set<String> getPolicyIDs() throws IOException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			/*
 			 * We could cache this, but this is meant to be used as a DAO in a REST API, i.e. the API should be as stateless as possible. Therefore, we should avoid caching when performance is not
 			 * critical (the performance-critical part is getPDP() only). Also this should be in sync as much as possible with the filesystem.
@@ -2190,6 +2276,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public ReadableDomainProperties removeDomain() throws IOException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			synchronized (domainDirPath)
 			{
 				if (Files.exists(domainDirPath, LinkOption.NOFOLLOW_LINKS))
@@ -2252,6 +2343,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public PrpRWProperties getOtherPrpProperties() throws IOException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			final DomainProperties props;
 			synchronized (domainDirPath)
 			{
@@ -2268,6 +2364,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		@Override
 		public PrpRWProperties setOtherPrpProperties(final PrpRWProperties props) throws IOException, IllegalArgumentException
 		{
+			if (enablePdpOnly)
+			{
+				throw DISABLED_OPERATION_EXCEPTION;
+			}
+
 			if (props == null)
 			{
 				throw NULL_PRP_PROPERTIES_ARGUMENT_EXCEPTION;
@@ -2358,14 +2459,16 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	 *            is NOT recommended unless the host is disconnected from the network. These generated UUIDs are used for domain IDs.
 	 * @param domainDAOClientFactory
 	 *            domain DAO client factory
+	 * @param enablePdpOnly
+	 *            enable only PDP-related operations (in particular, disable all PAP features)
 	 * @throws IOException
 	 *             I/O error occurred scanning existing domain folders in {@code domainsRoot} for loading.
 	 */
-	@ConstructorProperties({ "domainsRoot", "domainTmpl", "domainsSyncIntervalSec", "pdpModelHandler", "useRandomAddressBasedUUID", "domainDAOClientFactory" })
+	@ConstructorProperties({ "domainsRoot", "domainTmpl", "domainsSyncIntervalSec", "pdpModelHandler", "useRandomAddressBasedUUID", "domainDAOClientFactory", "enablePdpOnly" })
 	public FlatFileBasedDomainsDAO(final Resource domainsRoot, final Resource domainTmpl, final int domainsSyncIntervalSec, final PdpModelHandler pdpModelHandler,
 			final boolean useRandomAddressBasedUUID,
-			final DomainDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT, FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, DOMAIN_DAO_CLIENT> domainDAOClientFactory)
-			throws IOException
+			final DomainDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT, FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, DOMAIN_DAO_CLIENT> domainDAOClientFactory,
+			final boolean enablePdpOnly) throws IOException
 	{
 		if (domainsRoot == null || domainTmpl == null || pdpModelHandler == null || domainDAOClientFactory == null)
 		{
@@ -2373,8 +2476,19 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		this.domainDAOClientFactory = domainDAOClientFactory;
-		this.policyDAOClientFactory = domainDAOClientFactory.getPolicyDAOClientFactory();
-		this.policyVersionDAOClientFactory = policyDAOClientFactory.getVersionDAOClientFactory();
+
+		this.enablePdpOnly = enablePdpOnly;
+		if (enablePdpOnly)
+		{
+			// disable PAP features
+			this.policyDAOClientFactory = null;
+			this.policyVersionDAOClientFactory = null;
+		}
+		else
+		{
+			this.policyDAOClientFactory = domainDAOClientFactory.getPolicyDAOClientFactory();
+			this.policyVersionDAOClientFactory = policyDAOClientFactory.getVersionDAOClientFactory();
+		}
 
 		this.uuidGen = initUUIDGenerator(useRandomAddressBasedUUID);
 		this.pdpModelHandler = pdpModelHandler;
@@ -2515,6 +2629,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	@Override
 	public String addDomain(final WritableDomainProperties props) throws IOException, IllegalArgumentException
 	{
+		if (this.enablePdpOnly)
+		{
+			throw DISABLED_OPERATION_EXCEPTION;
+		}
+
 		final UUID uuid = uuidGen.generate();
 		/*
 		 * Encode UUID with Base64url to have shorter IDs in REST API URL paths and to be compatible with filenames on any operating system, since the resulting domain ID is used as name for the
@@ -2553,6 +2672,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	@Override
 	public Set<String> getDomainIDs(final String externalId) throws IOException
 	{
+		if (this.enablePdpOnly)
+		{
+			throw DISABLED_OPERATION_EXCEPTION;
+		}
+
 		synchronized (domainsRootDir)
 		{
 			if (externalId != null)
@@ -2644,6 +2768,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	@Override
 	public boolean containsDomain(final String domainId) throws IOException
 	{
+		if (this.enablePdpOnly)
+		{
+			throw DISABLED_OPERATION_EXCEPTION;
+		}
+
 		if (domainId == null)
 		{
 			throw NULL_DOMAIN_ID_ARG_EXCEPTION;

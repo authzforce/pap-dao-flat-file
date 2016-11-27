@@ -1,6 +1,35 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
+
+# Unreleased
+### Added
+* enablePdpOnly: this `FlatFileBasedDomainsDAO` constructor disables all PAP/"admin" features and supports only PDP decision requests/responses. 
+* Extension mechanism to switch HashMap/HashSet implementation; default implementation is based on native JRE and Guava.
+* Maven plugin owasp-dependency-check to check vulnerabilities in dependencies
+* From dependency authzforce-ce-core 6.0.0:
+	* Validation of 'n' argument (minimum of *true* arguments) of XACML 'n-of' function if this is constant (must be a positive integer not greater than the number of remaining arguments)
+	* Validation of second and third arguments of XACML substring function if these are constants (arg1 >= 0 && (arg2 == -1 || arg2 >= arg1))
+
+### Changed
+* Maven parent project version: 3.4.0 -> 4.0.0:
+	* **Java version: 1.7 -> 1.8**
+	* Guava dependency version: 18.0 -> 20.0
+* Dependency authzforce-ce-core-pap-api 5.3.0 -> 6.0.0
+* Dependency authzforce-ce-core 5.0.2 -> 6.0.0, with following change:
+	- Behavior of *unordered* rule combining algorithms (deny-overrides, permit-overrides, deny-unless-permit and permit-unless deny), i.e. for which the order of evaluation may be different from the order of declaration: child elements are re-ordered for more efficiency (e.g. Deny rules evaluated first in case of deny-overrides algorithm), therefore the algorithm implementation - the order of evaluation in particular - now differs from ordered-* variants.
+* Replaced Guava base64URL encoder/decoder with Java 8 native (Base64 class)
+
+### Removed
+* Dependency on Koloboke, replaced by extension mechanism mentioned in *Added* section that would allow to switch from the default HashMap/HashSet implementation to Koloboke-based.
+
+### Fixed
+* From dependency authzforce-ce-core 6.0.0:
+	* OW2 #AUTHZFORCE-23: enforcement of RuleId/PolicyId/PolicySetId uniqueness:
+		* PolicyId (resp. PolicySetId) should be unique across all policies loaded by PDP so that PolicyIdReferences (resp. PolicySetIdReferences) in Responses' PolicyIdentifierList are absolute references to applicable policies (no ambiguity).
+ 		* [RuleId should be unique within a policy](https://lists.oasis-open.org/archives/xacml/201310/msg00025.html) -> A rule is globally uniquely identified by the parent PolicyId and the RuleId.
+
+
 # 6.1.0
 ### Fixed
 - Other issues reported by Codacy
