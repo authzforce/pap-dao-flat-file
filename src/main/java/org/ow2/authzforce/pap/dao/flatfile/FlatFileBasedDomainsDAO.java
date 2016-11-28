@@ -391,6 +391,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 		private PdpFeatureType(final String id, final Class<? extends PdpExtension> extensionClass)
 		{
+			assert id != null;
 			this.id = id;
 			this.extensionClass = extensionClass;
 		}
@@ -401,6 +402,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			@Override
 			public String apply(final PdpFeatureType input)
 			{
+				assert input != null;
 				return input.id;
 			}
 
@@ -2464,11 +2466,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	 * @throws IOException
 	 *             I/O error occurred scanning existing domain folders in {@code domainsRoot} for loading.
 	 */
-	@ConstructorProperties({ "domainsRoot", "domainTmpl", "domainsSyncIntervalSec", "pdpModelHandler", "useRandomAddressBasedUUID", "domainDAOClientFactory", "enablePdpOnly" })
-	public FlatFileBasedDomainsDAO(final Resource domainsRoot, final Resource domainTmpl, final int domainsSyncIntervalSec, final PdpModelHandler pdpModelHandler,
+	@ConstructorProperties({ "domainsRoot", "domainTmpl", "domainsSyncIntervalSec", "pdpModelHandler", "enablePdpOnly", "useRandomAddressBasedUUID", "domainDAOClientFactory" })
+	public FlatFileBasedDomainsDAO(final Resource domainsRoot, final Resource domainTmpl, final int domainsSyncIntervalSec, final PdpModelHandler pdpModelHandler, final boolean enablePdpOnly,
 			final boolean useRandomAddressBasedUUID,
-			final DomainDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT, FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, DOMAIN_DAO_CLIENT> domainDAOClientFactory,
-			final boolean enablePdpOnly) throws IOException
+			final DomainDAOClient.Factory<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT, FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, DOMAIN_DAO_CLIENT> domainDAOClientFactory)
+			throws IOException
 	{
 		if (domainsRoot == null || domainTmpl == null || pdpModelHandler == null || domainDAOClientFactory == null)
 		{
