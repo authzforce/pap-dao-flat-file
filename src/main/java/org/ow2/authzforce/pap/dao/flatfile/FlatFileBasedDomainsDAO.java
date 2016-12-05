@@ -612,24 +612,19 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			 * synchonized block makes sure no other thread is messing with the domain directory while we synchronize it to domainMap. See also method #add(Properties)
 			 */
 			final DomainProperties props;
-			synchronized (domainDirPath)
+			synchronized (domainsRootDir)
 			{
 				LOGGER.debug("Domain '{}': synchronizing...", domainId);
 				if (Files.notExists(domainDirPath, LinkOption.NOFOLLOW_LINKS))
 				{
 					// DOMAIN DIRECTORY REMOVED
 					LOGGER.info("Domain '{}' removed from filesystem -> removing from cache", domainId);
-
-					synchronized (domainsRootDir)
-					{
-						removeDomainFromCache(domainId);
-					}
-
+					removeDomainFromCache(domainId);
 					return null;
 				}
 
 				// SYNC DOMAIN DIRECTORY
-				props = syncDomainProperties();
+				props = syncDomainProperties(false);
 				final boolean isChanged = syncPDP();
 				if (isChanged)
 				{
@@ -663,7 +658,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Constructs end-user policy admin domain
+		 * Constructs end-user policy admin domain. Must be called must use synchronized (domainsRootDir) block.
 		 * 
 		 * @param domainDirPath
 		 *            domain directory
@@ -732,18 +727,14 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			// propFile
 			this.propertiesFile = domainDirPath.resolve(DOMAIN_PROPERTIES_FILENAME).toFile();
 
-			if (props == null)
-			{
-				/*
-				 * Validate and reload domain properties file, load in particular the externalId in the externalId-to-domainId map
-				 */
-				getDomainProperties();
-			}
-			else
-			{
-				// set/save properties and update PDP
-				setDomainProperties(props);
-			}
+			/*
+			 * Set propertiesFileLastSyncedTime based on propertilesFile lastmodified, validate and reload domain properties file; in particular, sync externalId from propertiesFile to the externalId
+			 * in the externalId-to-domainId map
+			 */
+			/*
+			 * Caller must use synchronized (domainsRootDir) block
+			 */
+			updateDomainProperties(props);
 
 			// Just load the PDP from the files
 			reloadPDP();
@@ -912,37 +903,74 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Update externalId (cached value) and external-id-to-domain map.
+		 * Update externalId (cached value) and external-id-to-domain map. The caller must call this within a {@code synchronized(domainsRootDir)} block in which it guarantees the synchronization
+		 * between the domain's {@code newExternalId} and the externalId value in the domain properties on the filesystem. This method updates the externalId value only in the externalId-domainId
+		 * cache/map.
 		 * 
 		 * @param newExternalId
+		 *            new domain's externalId; null value means to unset the domain's externalId (undefined)
+		 * @throws IllegalArgumentException
+		 *             if {@code newExternalId != null} and {@code newExternalId} is already associated with another domainId (conflict), i.e. {@code domainIDsByExternalId.containsKey(newExternalId)}
 		 */
-		private void updateCachedExternalId(final String newExternalId)
+		private void updateCachedExternalId(final String newExternalId) throws IllegalArgumentException
+		{
+			if (cachedExternalId != null)
+			{
+				if (cachedExternalId.equals(newExternalId))
+				{
+					// nothing changed
+					return;
+				}
+
+				/*
+				 * externalId changed -> remove the old one from externalId-domainId map
+				 */
+				domainIDsByExternalId.remove(cachedExternalId);
+			}
+
+			if (newExternalId != null)
+			{
+				final String alreadyAssociatedDomainId = domainIDsByExternalId.putIfAbsent(newExternalId, domainId);
+				if (alreadyAssociatedDomainId != null)
+				{
+					throw new IllegalArgumentException("externalId conflict: '" + newExternalId + "' cannot be associated with domainId '" + domainId + "' because already associated with another");
+				}
+			}
+
+			cachedExternalId = newExternalId;
+		}
+
+		/**
+		 * Update domain properties from input {@code props} and/or from changes on the filesystem and synchronize with cached data (e.g. cachedExternalId, externalId-domainId map (if externalId
+		 * changed), etc.). Must be called within a {@code synchronized(domainsRootDir)} block
+		 * 
+		 * @param props
+		 *            new domain properties; if null, sync with properties file on the filesystem only
+		 * @throws IOException
+		 *             I/O error reading/writing properties on the filesystem
+		 */
+		private void updateDomainProperties(final WritableDomainProperties props) throws IOException
 		{
 			/*
-			 * Synchronized block makes sure the domain's cachedExternalId is synchronized with the corresponding value in domainIDsByExternalId map for that domain's Id
+			 * DomainProperties on the filesystem may contain other properties (e.g. PRP properties) than the ones in props, so we must preserve them
 			 */
-			synchronized (domainsRootDir)
+			if (props != null)
 			{
-				if (cachedExternalId == null)
-				{
-					// externalId not previously set
-					if (newExternalId != null)
-					{
-						domainIDsByExternalId.put(newExternalId, domainId);
+				// set/save properties
+				final DomainProperties updatedProps = loadProperties();
+				updatedProps.setDescription(props.getDescription());
+				updatedProps.setExternalId(props.getExternalId());
 
-					}
-				}
-				else if (!cachedExternalId.equals(newExternalId))
-				{
-					// externalId was set and has changed or unset
-					domainIDsByExternalId.remove(cachedExternalId);
-					if (newExternalId != null)
-					{
-						domainIDsByExternalId.put(newExternalId, domainId);
-					}
-				}
-
-				cachedExternalId = newExternalId;
+				// validate and save new properties to disk
+				saveProperties(updatedProps);
+				/*
+				 * sync properties file with memory (e.g. externalId-domainId map). Must be called within domainsRootDir block.
+				 */
+				syncDomainProperties(true);
+			}
+			else
+			{
+				syncDomainProperties(false);
 			}
 		}
 
@@ -959,19 +987,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				throw NULL_DOMAIN_PROPERTIES_ARGUMENT_EXCEPTION;
 			}
 
-			// Synchronize changes on domain conf data from
-			// multiple threads, keep minimal things in the synchronized block
-			synchronized (domainDirPath)
+			synchronized (domainsRootDir)
 			{
-				final DomainProperties updatedProps = syncDomainProperties();
-				updatedProps.setDescription(props.getDescription());
-				updatedProps.setExternalId(props.getExternalId());
-
-				// validate and save new properties to disk
-				saveProperties(updatedProps);
-				// update externalId (cached value) and external-id-to-domain
-				// map
-				updateCachedExternalId(props.getExternalId());
+				updateDomainProperties(props);
 			}
 
 			return new ReadableDomainPropertiesImpl(domainId, props.getDescription(), props.getExternalId());
@@ -979,9 +997,12 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		}
 
 		/**
-		 * Must be called within a synchronized(domainDirPath) block
+		 * Must be called within synchronized(domainsRootDir) block.
+		 * 
+		 * @param force
+		 *            force synchronization regardless of lastmodified timestamp on properties file, esp. when we know we just made/detected a change
 		 */
-		private DomainProperties syncDomainProperties() throws IOException
+		private DomainProperties syncDomainProperties(final boolean force) throws IOException
 		{
 			final long lastModifiedTime = propertiesFile.lastModified();
 			final boolean isFileModified = lastModifiedTime > propertiesFileLastSyncedTime;
@@ -995,8 +1016,11 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			// let's sync
 			propertiesFileLastSyncedTime = System.currentTimeMillis();
 			final DomainProperties props = loadProperties();
-			if (isFileModified)
+			if (force || isFileModified)
 			{
+				/*
+				 * Must be called within synchronized(domainsRootDir) block
+				 */
 				updateCachedExternalId(props.getExternalId());
 			}
 
@@ -1012,12 +1036,18 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 
 			final DomainProperties props;
-			synchronized (domainDirPath)
+			synchronized (domainsRootDir)
 			{
-				props = syncDomainProperties();
+				props = syncDomainProperties(false);
 			}
 
 			return new ReadableDomainPropertiesImpl(domainId, props.getDescription(), props.getExternalId());
+		}
+
+		@Override
+		public boolean isPAPEnabled()
+		{
+			return !enablePdpOnly;
 		}
 
 		/**
@@ -2351,9 +2381,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 
 			final DomainProperties props;
-			synchronized (domainDirPath)
+			synchronized (domainsRootDir)
 			{
-				props = syncDomainProperties();
+				props = syncDomainProperties(false);
 			}
 
 			final BigInteger maxPolicyCount = props.getMaxPolicyCount();
@@ -2377,9 +2407,9 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 			}
 
 			final DomainProperties updatedProps;
-			synchronized (domainDirPath)
+			synchronized (domainsRootDir)
 			{
-				updatedProps = syncDomainProperties();
+				updatedProps = loadProperties();
 				final int maxPolicyCount = props.getMaxPolicyCountPerDomain();
 				// check that new maxPolicyCount >= current policy count
 				final int policyCount = getPolicyCount();
@@ -2405,6 +2435,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 				updatedProps.setVersionRollingEnabled(props.isVersionRollingEnabled());
 				// validate and save new properties to disk
 				saveProperties(updatedProps);
+				syncDomainProperties(true);
 			}
 
 			return new PrpRWPropertiesImpl(props.getMaxPolicyCountPerDomain(), props.getMaxVersionCountPerPolicy(), props.isVersionRollingEnabled());
@@ -2413,29 +2444,43 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 	}
 
 	/**
-	 * Create domain DAO and register it in the map (incl. domainIDsByExternalId if props != null && props.getExternalId() != null)
+	 * Create domain DAO and register it in the map (incl. domainIDsByExternalId if props != null && props.getExternalId() != null). Must be called with {@code synchronized(domainsRootDir)} block
 	 * 
 	 * @param domainId
 	 * @param domainDirectory
 	 * @param props
 	 *            (optional), specific domain properties, or null if default or no properties should be used
-	 * @return domain DAO client
+	 * @return domain DAO client the existing domain if a domain with such ID already exists in the map and properties unchanged ({@code props == null}), else the new domain
 	 * @throws IOException
+	 * @throws IllegalArgumentException
+	 *             if a domain with such ID already exists and {@code props != null}; OR there is an externalId conflict, i.e. the externalId is set in {@code props} but is already associated with
+	 *             another domain (conflict)
 	 */
-	private DOMAIN_DAO_CLIENT addDomainToCacheAfterDirectoryCreated(final String domainId, final Path domainDirectory, final WritableDomainProperties props) throws IOException
+	private DOMAIN_DAO_CLIENT addDomainToCacheAfterDirectoryCreated(final String domainId, final Path domainDirectory, final WritableDomainProperties props) throws IOException,
+			IllegalArgumentException
 	{
-		final FlatFileBasedDomainDAO<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> domainDAO = new FileBasedDomainDAOImpl(domainDirectory, props);
+		final FileBasedDomainDAOImpl domainDAO = new FileBasedDomainDAOImpl(domainDirectory, props);
 		final DOMAIN_DAO_CLIENT domainDAOClient = domainDAOClientFactory.getInstance(domainId, domainDAO);
-		this.domainMap.put(domainId, domainDAOClient);
-
+		final DOMAIN_DAO_CLIENT prevDomain = this.domainMap.putIfAbsent(domainId, domainDAOClient);
 		if (props != null)
 		{
-
-			// props != null
-			final String domainExternalId = props.getExternalId();
-			if (domainExternalId != null)
+			if (prevDomain != null)
 			{
-				domainIDsByExternalId.put(domainExternalId, domainId);
+				/*
+				 * Domain already exists (domainId conflict)
+				 */
+				throw new IllegalArgumentException("Domain '" + domainId + "' already exists with possibly different properties than the ones in arguments");
+			}
+
+			// IllegalArgumentException raised if externalId conflict
+			domainDAO.updateCachedExternalId(props.getExternalId());
+		}
+		else
+		{
+			if (prevDomain != null)
+			{
+				// return existing domain
+				return prevDomain;
 			}
 		}
 
