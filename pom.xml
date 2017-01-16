@@ -3,7 +3,7 @@
    <parent>
       <groupId>org.ow2.authzforce</groupId>
       <artifactId>authzforce-ce-parent</artifactId>
-      <version>4.0.0</version>
+      <version>4.1.1</version>
    </parent>
    <artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
    <!-- Version must be >= authzforce-ce-core-pap-api dependency -->
@@ -35,12 +35,12 @@
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>${artifactId.prefix}-core-pap-api</artifactId>
-         <version>6.0.1-SNAPSHOT</version>
+         <version>6.2.0</version>
       </dependency>
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>${artifactId.prefix}-core</artifactId>
-         <version>6.0.0</version>
+         <version>6.1.0</version>
       </dependency>
    </dependencies>
    <build>
@@ -113,12 +113,8 @@
          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>findbugs-maven-plugin</artifactId>
-            <configuration>
-               <!-- Enables analysis which takes more memory but finds more bugs. If you run out of memory, changes the value of the effort element to 'Low'. -->
-               <effort>Max</effort>
-               <!-- Reports all bugs (other values are medium and max) -->
-               <threshold>Low</threshold>
-               <failOnError>true</failOnError>
+             <configuration>
+               <excludeFilterFile>findbugs-exclude-filter.xml</excludeFilterFile>
             </configuration>
             <executions>
                <execution>
