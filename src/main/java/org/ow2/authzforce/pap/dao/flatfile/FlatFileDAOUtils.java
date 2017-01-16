@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2012-2016 Thales Services SAS.
+ * Copyright (C) 2012-2017 Thales Services SAS.
  *
  * This file is part of AuthZForce CE.
  *
@@ -34,32 +34,30 @@ import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 
 import javax.xml.bind.JAXBException;
 
 import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
 
+import org.ow2.authzforce.core.pdp.api.HashCollections;
 import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils;
 import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
 import org.ow2.authzforce.core.pdp.api.XMLUtils.NoNamespaceFilteringParser;
 import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
 
-import com.google.common.base.Preconditions;
-import com.google.common.io.BaseEncoding;
-import com.koloboke.collect.map.hash.HashObjObjMaps;
-
 /**
  * Utility methods
  */
 public final class FlatFileDAOUtils
 {
-	// FIXME: Instead of google BaseEncoding, use
-	// java.util.Base64.getURLEncoder() when moving to Java 8
-	private static final BaseEncoding BASE64URL_NO_PADDING_ENCODING = BaseEncoding.base64Url().omitPadding();
+	private static final Base64.Encoder BASE64URL_NO_PADDING_ENCODER = Base64.getUrlEncoder().withoutPadding();
+	private static final Base64.Decoder BASE64URL_NO_PADDING_DECODER = Base64.getUrlDecoder();
 
 	private static final IllegalArgumentException NULL_FILE_ARGUMENT_EXCEPTION = new IllegalArgumentException("Null file arg");
 
@@ -72,11 +70,11 @@ public final class FlatFileDAOUtils
 	 */
 	public static String base64UrlEncode(final byte[] bytes)
 	{
-		return BASE64URL_NO_PADDING_ENCODING.encode(bytes);
+		return BASE64URL_NO_PADDING_ENCODER.encodeToString(bytes);
 	}
 
 	/**
-	 * Encode string with base64url specified by RFC 4648, without padding. Used to create filenames compatible with most filesystems
+	 * Encode UTF-8-encoded String bytes with base64url specified by RFC 4648, without padding. Used to create filenames compatible with most filesystems
 	 * 
 	 * @param input
 	 *            input
@@ -84,11 +82,11 @@ public final class FlatFileDAOUtils
 	 */
 	public static String base64UrlEncode(final String input)
 	{
-		return BASE64URL_NO_PADDING_ENCODING.encode(input.getBytes(StandardCharsets.UTF_8));
+		return base64UrlEncode(input.getBytes(StandardCharsets.UTF_8));
 	}
 
 	/**
-	 * Decode string encoded with {@link FlatFileDAOUtils#base64UrlEncode(String)}
+	 * Decode UTF-8-encoded string encoded with {@link FlatFileDAOUtils#base64UrlEncode(String)}
 	 * 
 	 * @param encoded
 	 *            input
@@ -98,7 +96,7 @@ public final class FlatFileDAOUtils
 	 */
 	public static String base64UrlDecode(final String encoded) throws IllegalArgumentException
 	{
-		return new String(BASE64URL_NO_PADDING_ENCODING.decode(encoded), StandardCharsets.UTF_8);
+		return new String(BASE64URL_NO_PADDING_DECODER.decode(encoded), StandardCharsets.UTF_8);
 	}
 
 	/**
@@ -346,7 +344,7 @@ public final class FlatFileDAOUtils
 		final URL policyURL;
 		try
 		{
-			policyURL = Preconditions.checkNotNull(policyFilepath, "Undefined policyFilepath").toUri().toURL();
+			policyURL = Objects.requireNonNull(policyFilepath, "Undefined policyFilepath").toUri().toURL();
 		}
 		catch (final MalformedURLException e)
 		{
@@ -409,8 +407,8 @@ public final class FlatFileDAOUtils
 	 */
 	public static Entry<PolicyVersion, Path> getLatestPolicyVersion(final Path versionsDirectory, final SuffixMatchingDirectoryStreamFilter filenameSuffixMatchingFilter) throws IOException
 	{
-		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(Preconditions.checkNotNull(versionsDirectory, "Undefined versionsDirectory"),
-				Preconditions.checkNotNull(filenameSuffixMatchingFilter, "Undefined filenameSuffixMatchingFilter")))
+		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(Objects.requireNonNull(versionsDirectory, "Undefined versionsDirectory"),
+				Objects.requireNonNull(filenameSuffixMatchingFilter, "Undefined filenameSuffixMatchingFilter")))
 		{
 			PolicyVersion latestVersion = null;
 			Path latestFilepath = null;
@@ -455,9 +453,9 @@ public final class FlatFileDAOUtils
 	 */
 	public static PolicyVersions<Path> getPolicyVersions(final Path versionsDirectory, final SuffixMatchingDirectoryStreamFilter filenameSuffixMatchingFilter) throws IOException
 	{
-		Preconditions.checkNotNull(versionsDirectory, "Undefined versionsDirectory");
-		Preconditions.checkNotNull(versionsDirectory, "Undefined filenameSuffixMatchingFilter");
-		final Map<PolicyVersion, Path> versions = HashObjObjMaps.newUpdatableMap();
+		Objects.requireNonNull(versionsDirectory, "Undefined versionsDirectory");
+		Objects.requireNonNull(versionsDirectory, "Undefined filenameSuffixMatchingFilter");
+		final Map<PolicyVersion, Path> versions = HashCollections.newUpdatableMap();
 		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(versionsDirectory, filenameSuffixMatchingFilter))
 		{
 			for (final Path policyVersionFilePath : policyDirStream)
@@ -486,21 +484,15 @@ public final class FlatFileDAOUtils
 	{
 	}
 
-	// public static void main(String[] args)
+	// public static void main(final String[] args)
 	// {
-	// String input = "mus#321=dis?lmth.xedni/DSX/moc.gnaygnoreh//:ptth";
-	// // String input = "mailto:herong_yang@yahoo.com";
+	// final String input = "mus#321=dis?lmth.xedni/DSX/moc.gnaygnoreh//:ptth@éàçèüНа gør берегу пустынных волн ὕαλον ϕαγεῖν δύναμα";
 	//
-	// System.out.println("input: " + input);
-	// // NB: instead of google BaseEncoding, use
-	// java.util.Base64.getURLEncoder() when moving to Java 8
-	// final String encodedId =
-	// BaseEncoding.base64Url().omitPadding().encode(input.getBytes(StandardCharsets.UTF_8));
+	// System.out.println("input: '" + input + "'");
+	// final String encodedId = base64UrlEncode(input);
 	// System.out.println("Encoded base64url (without padding): " + encodedId);
 	//
-	// final byte[] decoded =
-	// BaseEncoding.base64Url().omitPadding().decode(encodedId);
-	// System.out.println("Base64url-decoded (without padding): '" + new
-	// String(decoded, StandardCharsets.UTF_8) + "'");
+	// final String decoded = base64UrlDecode(encodedId);
+	// System.out.println("Base64url-decoded (without padding): '" + decoded + "'");
 	// }
 }
