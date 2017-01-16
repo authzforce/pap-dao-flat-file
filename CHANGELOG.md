@@ -2,7 +2,7 @@
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
 
-# Unreleased
+## 7.0.0
 ### Added
 * enablePdpOnly: this `FlatFileBasedDomainsDAO` constructor disables all PAP/"admin" features and supports only PDP decision requests/responses. 
 * Extension mechanism to switch HashMap/HashSet implementation; default implementation is based on native JRE and Guava.
