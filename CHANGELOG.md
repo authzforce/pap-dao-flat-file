@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file following the [K
 
 ## 7.0.0
 ### Added
-* enablePdpOnly: this `FlatFileBasedDomainsDAO` constructor disables all PAP/"admin" features and supports only PDP decision requests/responses. 
+* enablePdpOnly: this `FlatFileBasedDomainsDAO` constructor argument disables all PAP/"admin" features and supports only PDP decision requests/responses. 
 * Extension mechanism to switch HashMap/HashSet implementation; default implementation is based on native JRE and Guava.
 * From dependency authzforce-ce-core 6.1.0:
 	* Validation of 'n' argument (minimum of *true* arguments) of XACML 'n-of' function if this is constant (must be a positive integer not greater than the number of remaining arguments)
