@@ -94,16 +94,15 @@ import org.ow2.authzforce.core.pap.api.dao.WritablePdpProperties;
 import org.ow2.authzforce.core.pdp.api.DecisionResultFilter;
 import org.ow2.authzforce.core.pdp.api.EnvironmentPropertyName;
 import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils;
-import org.ow2.authzforce.core.pdp.api.PDP;
+import org.ow2.authzforce.core.pdp.api.PDPEngine;
 import org.ow2.authzforce.core.pdp.api.PdpExtension;
 import org.ow2.authzforce.core.pdp.api.RequestFilter;
 import org.ow2.authzforce.core.pdp.api.combining.CombiningAlg;
 import org.ow2.authzforce.core.pdp.api.func.Function;
 import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
 import org.ow2.authzforce.core.pdp.api.value.DatatypeFactory;
+import org.ow2.authzforce.core.pdp.impl.BasePdpEngine;
 import org.ow2.authzforce.core.pdp.impl.DefaultEnvironmentProperties;
-import org.ow2.authzforce.core.pdp.impl.PDPImpl;
-import org.ow2.authzforce.core.pdp.impl.PdpConfigurationParser;
 import org.ow2.authzforce.core.pdp.impl.PdpExtensionLoader;
 import org.ow2.authzforce.core.pdp.impl.PdpModelHandler;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
@@ -598,7 +597,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 
 		private volatile String cachedExternalId = null;
 
-		private volatile PDPImpl pdp = null;
+		private volatile BasePdpEngine pdp = null;
 
 		/*
 		 * Last time when PDP was (re)loaded from repository (pdp conf and policy files in domain directory) (set only by reloadPDP)
@@ -781,7 +780,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		{
 			lastPdpSyncedTime = System.currentTimeMillis();
 			// test if PDP conf valid, and update the domain's PDP only if valid
-			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfFile, pdpModelHandler);
+			final BasePdpEngine newPDP = BasePdpEngine.getInstance(pdpConfFile, pdpModelHandler);
 			// did not throw exception, so valid
 			// update the domain's PDP
 			if (pdp != null)
@@ -812,7 +811,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		private void reloadPDP(final Pdp pdpConfTmpl) throws IllegalArgumentException, IOException
 		{
 			// test if PDP conf valid, and update the domain's PDP only if valid
-			final PDPImpl newPDP = PdpConfigurationParser.getPDP(pdpConfTmpl, pdpConfEnvProps);
+			final BasePdpEngine newPDP = BasePdpEngine.getInstance(pdpConfTmpl, pdpConfEnvProps);
 			// did not throw exception, so valid
 			// Commit/save the new PDP conf
 			try
@@ -1517,7 +1516,7 @@ public final class FlatFileBasedDomainsDAO<VERSION_DAO_CLIENT extends PolicyVers
 		 * @return domain PDP
 		 */
 		@Override
-		public PDP getPDP()
+		public PDPEngine<?> getPDP()
 		{
 			return this.pdp;
 		}
