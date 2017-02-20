@@ -35,12 +35,12 @@
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>${artifactId.prefix}-core-pap-api</artifactId>
-         <version>6.2.1-SNAPSHOT</version>
+         <version>6.3.0</version>
       </dependency>
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>${artifactId.prefix}-core</artifactId>
-         <version>7.0.1-SNAPSHOT</version>
+         <version>7.1.0</version>
       </dependency>
    </dependencies>
    <build>

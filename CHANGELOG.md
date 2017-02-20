@@ -2,6 +2,17 @@
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
 
+## Unreleased
+### Changed
+- Version of parent project (authzforce-ce-parent): 5.0.0
+- Version of dependency authzforce-ce-core-pap-api: 6.3.0
+	-> API changes (non-backward compatible): return type of DomainDAO#getPDP() changed to PDPEngine (instead of Pdp)
+- Version of dependency authzforce-ce-core: 7.1.0
+- Version of dependency authzforce-ce-core-pdp-api: 9.0.0 
+	-> API changes (non-backward compatible) for PDP extensions:  DecisionCache, DecisionResultFilter
+- Version of dependencies SLF4J: 1.7.22; Spring: 4.3.6; Guava: 21.0
+
+
 ## 7.0.0
 ### Added
 * enablePdpOnly: this `FlatFileBasedDomainsDAO` constructor argument disables all PAP/"admin" features and supports only PDP decision requests/responses. 
