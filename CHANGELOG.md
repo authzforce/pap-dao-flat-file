@@ -1,6 +1,7 @@
 # Change log
 All notable changes to this project are documented in this file following the [Keep a CHANGELOG](http://keepachangelog.com) conventions.
 
+Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
 ## 8.0.0
 ### Changed
@@ -11,6 +12,9 @@ All notable changes to this project are documented in this file following the [K
 - Version of dependency authzforce-ce-core-pdp-api: 9.0.0 
 	-> API changes (non-backward compatible) for PDP extensions:  DecisionCache, DecisionResultFilter
 - Version of dependencies SLF4J: 1.7.22; Spring: 4.3.6; Guava: 21.0
+
+### Fixed
+- [OW2-25] NullPointerException when parsing Apply expressions using invalid/unsupported Function ID. This is the final fix addressing higher-order functions. Initial fix in v7.0.0 only addressed first-order ones.
 
 
 ## 7.0.0
@@ -38,10 +42,10 @@ All notable changes to this project are documented in this file following the [K
 
 ### Fixed
 * From dependency authzforce-ce-core 6.0.0:
-	* OW2 #AUTHZFORCE-23: enforcement of RuleId/PolicyId/PolicySetId uniqueness:
+	* [OW2-23] enforcement of RuleId/PolicyId/PolicySetId uniqueness:
 		* PolicyId (resp. PolicySetId) should be unique across all policies loaded by PDP so that PolicyIdReferences (resp. PolicySetIdReferences) in Responses' PolicyIdentifierList are absolute references to applicable policies (no ambiguity).
  		* [RuleId should be unique within a policy](https://lists.oasis-open.org/archives/xacml/201310/msg00025.html) -> A rule is globally uniquely identified by the parent PolicyId and the RuleId.
-	* OW2 #AUTHZFORCE-25: NullPointerException when parsing Apply expressions using invalid/unsupported Function ID
+	* [OW2-25] NullPointerException when parsing Apply expressions using invalid/unsupported Function ID. Partial fix for first-order functions only; see release 8.0.0 for final fix.
 * Security issues reported by Find Security Bugs plugin
 
 
