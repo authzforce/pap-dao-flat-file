@@ -3,14 +3,23 @@ All notable changes to this project are documented in this file following the [K
 
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
+
+## Unreleased
+### Changed
+- Version of parent project (authzforce-ce-parent): 5.1.0:
+	- Project URL: https://tuleap.ow2.org/projects/authzforce -> https://authzforce.ow2.org
+	- GIT repository URL base: https://tuleap.ow2.org/plugins/git/authzforce -> https://gitlab.ow2.org/authzforce
+- Version of dependency authzforce-ce-core-pap-api: 6.4.0
+- Dependency authzforce-ce-core replaced with authzforce-ce-core-pdp-engine (authzforce-ce-core is now a multi-module project made of the core module `pdp-engine` and test utilities module `pdp-testutils`) with version 8.0.0
+
+
 ## 8.0.0
 ### Changed
 - Version of parent project (authzforce-ce-parent): 5.0.0
-- Version of dependency authzforce-ce-core-pap-api: 6.3.0
-	-> API changes (non-backward compatible): return type of DomainDAO#getPDP() changed to PDPEngine (instead of Pdp)
+- Version of dependency authzforce-ce-core-pap-api: 6.3.0 -> API changes (non-backward compatible): 
+	- Return type of DomainDAO#getPDP() changed to PDPEngine (instead of Pdp)
+	- PDP extension interfaces changed:  DecisionCache, DecisionResultFilter
 - Version of dependency authzforce-ce-core: 7.1.0
-- Version of dependency authzforce-ce-core-pdp-api: 9.0.0 
-	-> API changes (non-backward compatible) for PDP extensions:  DecisionCache, DecisionResultFilter
 - Version of dependencies SLF4J: 1.7.22; Spring: 4.3.6; Guava: 21.0
 
 ### Fixed
