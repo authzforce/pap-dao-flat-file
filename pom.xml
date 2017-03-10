@@ -3,14 +3,14 @@
    <parent>
       <groupId>org.ow2.authzforce</groupId>
       <artifactId>authzforce-ce-parent</artifactId>
-      <version>5.0.0</version>
+      <version>5.1.0</version>
    </parent>
    <artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
    <!-- Version must be >= authzforce-ce-core-pap-api dependency -->
-   <version>8.0.0</version>
+   <version>8.1.0</version>
    <name>${project.groupId}:${project.artifactId}</name>
-   <description>AuthZForce CE - PAP DAO implementation based on flat file database</description>
-   <url>https://tuleap.ow2.org/projects/authzforce</url>
+   <description>AuthzForce CE - PAP DAO implementation based on flat file database</description>
+   <url>${project.url}</url>
    <scm>
       <connection>scm:git:${git.url.base}/pap-dao-flat-file.git</connection>
       <developerConnection>scm:git:${git.url.base}/pap-dao-flat-file.git</developerConnection>
@@ -35,12 +35,12 @@
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>${artifactId.prefix}-core-pap-api</artifactId>
-         <version>6.3.0</version>
+         <version>6.4.0</version>
       </dependency>
       <dependency>
          <groupId>${project.groupId}</groupId>
-         <artifactId>${artifactId.prefix}-core</artifactId>
-         <version>7.1.0</version>
+         <artifactId>${artifactId.prefix}-core-pdp-engine</artifactId>
+         <version>8.0.0</version>
       </dependency>
    </dependencies>
    <build>
