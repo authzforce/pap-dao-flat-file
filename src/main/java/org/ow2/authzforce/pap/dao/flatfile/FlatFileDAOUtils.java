@@ -45,11 +45,11 @@ import javax.xml.bind.JAXBException;
 import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
 
 import org.ow2.authzforce.core.pdp.api.HashCollections;
-import org.ow2.authzforce.core.pdp.api.JaxbXACMLUtils;
-import org.ow2.authzforce.core.pdp.api.XMLUtils.NamespaceFilteringParser;
-import org.ow2.authzforce.core.pdp.api.XMLUtils.NoNamespaceFilteringParser;
+import org.ow2.authzforce.core.pdp.api.XmlUtils.NoXmlnsFilteringParser;
+import org.ow2.authzforce.core.pdp.api.XmlUtils.XmlnsFilteringParser;
 import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
+import org.ow2.authzforce.xacml.Xacml3JaxbHelper;
 
 /**
  * Utility methods
@@ -339,7 +339,7 @@ public final class FlatFileDAOUtils
 	 * @throws JAXBException
 	 *             error parsing XACML policy file into JAXB PolicySet
 	 */
-	public static PolicySet loadPolicy(final Path policyFilepath, final NamespaceFilteringParser xacmlParser) throws IllegalArgumentException, JAXBException
+	public static PolicySet loadPolicy(final Path policyFilepath, final XmlnsFilteringParser xacmlParser) throws IllegalArgumentException, JAXBException
 	{
 		final URL policyURL;
 		try
@@ -351,7 +351,7 @@ public final class FlatFileDAOUtils
 			throw new IllegalArgumentException("Failed to locate policy file: " + policyFilepath, e);
 		}
 
-		final NamespaceFilteringParser nonNullXacmlParser = xacmlParser == null ? new NoNamespaceFilteringParser(JaxbXACMLUtils.createXacml3Unmarshaller()) : xacmlParser;
+		final XmlnsFilteringParser nonNullXacmlParser = xacmlParser == null ? new NoXmlnsFilteringParser(Xacml3JaxbHelper.createXacml3Unmarshaller()) : xacmlParser;
 		final Object jaxbPolicyOrPolicySetObj;
 		try
 		{

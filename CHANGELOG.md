@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file following the [K
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
 
+## Unreleased
+- Changed parent project (authzforce-ce-parent) version: 5.1.0 -> 7.0.0
+  - Spring: 4.3.6 -> 4.3.12
+- Changed authzforce-ce-core-pap-api version: 6.4.0 -> 9.0.0
+  - authzforce-ce-core-pdp-api: 9.1.0 -> 12.0.0
+	- More optimal implementation of XACML integer values: 3 possible GenericInteger interface implementations depending on maximum (size) (ArbitrarilyBigInteger for java BigIntegers, MediumInteger for java Integers, and LongInteger for java Longs), with value caching (like Java Integer/Long). This optimizes memory usage / CPU computation when dealing with XACML integers small enough to fit in Java Integers/Longs.
+	- Changed Java class naming conventions regarding acronyms (only first letter should be uppercase, see also
+https://google.github.io/styleguide/javaguide.html#s5.3-camel-case)
+	- Each domain now has 2 PDP engines for both XACML/XML and XACML/JSON input/output if JSON Profile enabled
+- Added dependency authzforce-ce-core-pdp-io-xacml-json for JSON Profile support in domain's PDP
+
+
 ## 8.1.0
 ### Changed
 - Version of parent project (authzforce-ce-parent): 5.1.0:

@@ -3,7 +3,7 @@
    <parent>
       <groupId>org.ow2.authzforce</groupId>
       <artifactId>authzforce-ce-parent</artifactId>
-      <version>5.1.0</version>
+      <version>7.0.0</version>
    </parent>
    <artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
    <!-- Version must be >= authzforce-ce-core-pap-api dependency -->
@@ -18,6 +18,16 @@
       <!-- Publicly browsable repository URL. For example, via Gitlab web UI. -->
       <url>${git.url.base}/pap-dao-flat-file</url>
    </scm>
+   <properties>
+      <authzforce-ce.core.version>10.0.0</authzforce-ce.core.version>
+   </properties>
+   <repositories>
+      <repository>
+         <!-- For org.everit.json.schema -->
+         <id>jitpack.io</id>
+         <url>https://jitpack.io</url>
+      </repository>
+   </repositories>
    <dependencies>
       <!-- Third-party dependencies -->
       <dependency>
@@ -35,12 +45,17 @@
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>${artifactId.prefix}-core-pap-api</artifactId>
-         <version>6.4.0</version>
+         <version>9.0.0</version>
       </dependency>
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>${artifactId.prefix}-core-pdp-engine</artifactId>
-         <version>8.0.0</version>
+         <version>${authzforce-ce.core.version}</version>
+      </dependency>
+      <dependency>
+         <groupId>org.ow2.authzforce</groupId>
+         <artifactId>${artifactId.prefix}-core-pdp-io-xacml-json</artifactId>
+         <version>${authzforce-ce.core.version}</version>
       </dependency>
    </dependencies>
    <build>
@@ -113,7 +128,7 @@
          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>findbugs-maven-plugin</artifactId>
-             <configuration>
+            <configuration>
                <excludeFilterFile>findbugs-exclude-filter.xml</excludeFilterFile>
             </configuration>
             <executions>
