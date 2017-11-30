@@ -5,15 +5,25 @@ Issues reported on [GitHub](https://github.com/authzforce/core/issues) are refer
 
 
 ## Unreleased
+### Changed
 - Changed parent project (authzforce-ce-parent) version: 5.1.0 -> 7.0.0
   - Spring: 4.3.6 -> 4.3.12
 - Changed authzforce-ce-core-pap-api version: 6.4.0 -> 9.0.0
   - authzforce-ce-core-pdp-api: 9.1.0 -> 12.0.0
 	- More optimal implementation of XACML integer values: 3 possible GenericInteger interface implementations depending on maximum (size) (ArbitrarilyBigInteger for java BigIntegers, MediumInteger for java Integers, and LongInteger for java Longs), with value caching (like Java Integer/Long). This optimizes memory usage / CPU computation when dealing with XACML integers small enough to fit in Java Integers/Longs.
-	- Changed Java class naming conventions regarding acronyms (only first letter should be uppercase, see also
+    - Changed Java class naming conventions regarding acronyms (only first letter should be uppercase, see also
 https://google.github.io/styleguide/javaguide.html#s5.3-camel-case)
-	- Each domain now has 2 PDP engines for both XACML/XML and XACML/JSON input/output if JSON Profile enabled
-- Added dependency authzforce-ce-core-pdp-io-xacml-json for JSON Profile support in domain's PDP
+    - Each domain now has 2 PDP engines for both XACML/XML and XACML/JSON input/output if JSON Profile enabled
+- Changed authzforce-ce-core-pdp-engine: 8.0.0 -> 10.0.0
+  - Changed PDP configuration XSD: 5.0.0 -> 6.0.0:
+	- Replaced attributes `requestFilter` and `resultFilter` with element `ioProcChain` of new type `InOutProcChain` defining a pair of request preprocessor (ex-requestFilter) and result postprocessor (ex-resultFilter)
+	- (not visible via API) Replaced attribute `badRequestStatusDetailLevel` with `clientRequestErrorVerbosityLevel`
+	- (not visible via API) Added `maxIntegerValue` attribute allowing to define the expected max integer value to be handled by the PDP engine during evaluation, based on which the engine selects the best Java representation among several (BigInteger, Long, Integer) for memory and CPU usage optimization
+- Changed PDP feature identifiers (in pdpProperties): *:request-filter:* -> *:request-preproc:*; *:result-filter:* -> *:result-postproc:*
+
+### Added
+- Possibility of defining two pairs of request/result processors, 1 for XACML/XML and 1 for XACML/JSON input/output
+- Added dependency authzforce-ce-core-pdp-io-xacml-json for JSON Profile support in domain's PDP.
 
 
 ## 8.1.0
