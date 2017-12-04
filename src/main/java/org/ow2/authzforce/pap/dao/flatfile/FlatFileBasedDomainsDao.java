@@ -1028,7 +1028,7 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 				 * Check whether externalId already used if changed
 				 */
 				final String newExternalId = props.getExternalId();
-				if (newExternalId != this.cachedExternalId && domainIDsByExternalId.containsKey(newExternalId))
+				if (newExternalId != null && !newExternalId.equals(this.cachedExternalId) && domainIDsByExternalId.containsKey(newExternalId))
 				{
 					throw new IllegalArgumentException("externalId conflict: '" + newExternalId + "' cannot be associated with domainId '" + domainId + "' because already associated with another");
 				}
