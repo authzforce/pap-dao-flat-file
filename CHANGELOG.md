@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file following the [K
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
 
+## 9.1.0
+### Changed
+- Parent project (authzforce-ce-parent) version: 7.0.0 -> 7.1.0
+- Dependency versions: 
+	- authzforce-ce-core: 10.0.0 -> 10.1.0:
+		- authzforce-ce-xacml-json-model: 1.0.0 -> 1.1.0
+			- org.everit.json.schema: 1.6.0 -> 1.6.1
+			- guava: 21.0 -> 22.0
+			- json: 20170516 -> 20171018
+		- authzforce-ce-core-pdp-api: 12.0.0 -> 12.1.0
+	- authzforce-ce-core-pap-api: 9.0.0 -> 9.1.0
+
+### Added
+- Uniqueness check on domains' externalId property (not two domains may have the same), before allowing to create new domain or changing a domain's externalId
+
+
 ## 9.0.0
 ### Changed
 - Changed parent project (authzforce-ce-parent) version: 5.1.0 -> 7.0.0
