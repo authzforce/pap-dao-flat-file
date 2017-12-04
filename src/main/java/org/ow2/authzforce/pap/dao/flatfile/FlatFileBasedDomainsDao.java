@@ -1024,6 +1024,15 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 			 */
 			if (props != null)
 			{
+				/*
+				 * Check whether externalId already used if changed
+				 */
+				final String newExternalId = props.getExternalId();
+				if (newExternalId != null && !newExternalId.equals(this.cachedExternalId) && domainIDsByExternalId.containsKey(newExternalId))
+				{
+					throw new IllegalArgumentException("externalId conflict: '" + newExternalId + "' cannot be associated with domainId '" + domainId + "' because already associated with another");
+				}
+
 				// set/save properties
 				final DomainProperties updatedProps = loadProperties();
 				updatedProps.setDescription(props.getDescription());
@@ -2879,13 +2888,22 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 		final String domainId = FlatFileDAOUtils.base64UrlEncode(byteBuf.array());
 		synchronized (domainsRootDir)
 		{
-			// this should not happen if the UUID generator can be trusted, but
-			// - hey - we never
-			// know.
+			/*
+			 * This should not happen if the UUID generator can be trusted, but - hey - we never know.
+			 */
 			if (this.domainMap.containsKey(domainId))
 			{
 				throw new ConcurrentModificationException("Generated domain ID conflicts (is same as) ID of existing domain (flawed domain UUID generator or ID generated in different way?): ID="
 						+ domainId);
+			}
+
+			/*
+			 * Check whether externalId already used
+			 */
+			final String newExternalId = props.getExternalId();
+			if (newExternalId != null && domainIDsByExternalId.containsKey(newExternalId))
+			{
+				throw new IllegalArgumentException("externalId conflict: '" + newExternalId + "' cannot be associated with domainId '" + domainId + "' because already associated with another");
 			}
 
 			final Path domainDir = this.domainsRootDir.resolve(domainId);
