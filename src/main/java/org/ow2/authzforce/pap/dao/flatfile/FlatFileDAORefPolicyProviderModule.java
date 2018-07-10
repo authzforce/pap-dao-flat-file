@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2012-2017 Thales Services SAS.
+ * Copyright (C) 2012-2018 Thales Services SAS.
  *
  * This file is part of AuthzForce CE.
  *
@@ -34,8 +34,6 @@ import java.util.Optional;
 
 import javax.xml.bind.JAXBException;
 
-import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
-
 import org.ow2.authzforce.core.pdp.api.EnvironmentProperties;
 import org.ow2.authzforce.core.pdp.api.HashCollections;
 import org.ow2.authzforce.core.pdp.api.IndeterminateEvaluationException;
@@ -47,14 +45,16 @@ import org.ow2.authzforce.core.pdp.api.policy.BaseStaticRefPolicyProvider;
 import org.ow2.authzforce.core.pdp.api.policy.CloseableRefPolicyProvider;
 import org.ow2.authzforce.core.pdp.api.policy.PolicyRefsMetadata;
 import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
+import org.ow2.authzforce.core.pdp.api.policy.PolicyVersionPatterns;
 import org.ow2.authzforce.core.pdp.api.policy.StaticTopLevelPolicyElementEvaluator;
-import org.ow2.authzforce.core.pdp.api.policy.VersionPatterns;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluators;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyMap;
 import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
 import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDAORefPolicyProvider;
 import org.ow2.authzforce.xacml.identifiers.XacmlStatusCode;
 import org.springframework.util.ResourceUtils;
+
+import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
 
 /**
  * Static Ref Policy Provider for the File-based PAP DAO. This provider expects to find a XACML PolicySet file at PARENT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX. PolicySetId and Version
@@ -115,7 +115,7 @@ public final class FlatFileDAORefPolicyProviderModule extends BaseStaticRefPolic
 	private final PolicyMap<PolicyEvaluatorSupplier> policyCache;
 
 	private FlatFileDAORefPolicyProviderModule(final Path policyParentDirectory, final String suffix, final XmlnsFilteringParserFactory xacmlParserFactory, final ExpressionFactory expressionFactory,
-			final CombiningAlgRegistry combiningAlgRegistry, final int maxPolicySetRefDepth) throws IllegalArgumentException
+	        final CombiningAlgRegistry combiningAlgRegistry, final int maxPolicySetRefDepth) throws IllegalArgumentException
 	{
 		super(maxPolicySetRefDepth);
 		assert policyParentDirectory != null;
@@ -185,14 +185,14 @@ public final class FlatFileDAORefPolicyProviderModule extends BaseStaticRefPolic
 	}
 
 	@Override
-	public StaticTopLevelPolicyElementEvaluator getPolicy(final String id, final Optional<VersionPatterns> versionPatterns) throws IndeterminateEvaluationException
+	public StaticTopLevelPolicyElementEvaluator getPolicy(final String id, final Optional<PolicyVersionPatterns> versionPatterns) throws IndeterminateEvaluationException
 	{
 		throw UNSUPPORTED_POLICY_REFERENCE_EXCEPTION;
 	}
 
 	@Override
-	public StaticTopLevelPolicyElementEvaluator getPolicySet(final String id, final Optional<VersionPatterns> versionPatterns, final Deque<String> policySetRefChain)
-			throws IndeterminateEvaluationException
+	public StaticTopLevelPolicyElementEvaluator getPolicySet(final String id, final Optional<PolicyVersionPatterns> versionPatterns, final Deque<String> policySetRefChain)
+	        throws IndeterminateEvaluationException
 	{
 		// Request for PolicySetEvaluator (from PolicySetIdReference)
 		final Entry<PolicyVersion, PolicyEvaluatorSupplier> policyEntry = policyCache.get(id, versionPatterns);
@@ -211,7 +211,8 @@ public final class FlatFileDAORefPolicyProviderModule extends BaseStaticRefPolic
 			// throw back an high-level exception message for easier
 			// troubleshooting (no file path)
 			final PolicyVersion version = policyEntry.getKey();
-			throw new IndeterminateEvaluationException("Matched PolicySet '" + id + "' (version " + version + ") is invalid or its content is unavailable", XacmlStatusCode.PROCESSING_ERROR.value(), e);
+			throw new IndeterminateEvaluationException("Matched PolicySet '" + id + "' (version " + version + ") is invalid or its content is unavailable", XacmlStatusCode.PROCESSING_ERROR.value(),
+			        e);
 		}
 
 		/*
@@ -264,7 +265,7 @@ public final class FlatFileDAORefPolicyProviderModule extends BaseStaticRefPolic
 		}
 
 		private StaticTopLevelPolicyElementEvaluator get(final FlatFileDAORefPolicyProviderModule refPolicyProviderModule, final Deque<String> policySetRefChain)
-				throws IndeterminateEvaluationException
+		        throws IndeterminateEvaluationException
 		{
 			/*
 			 * Prevent simulatenous attemps to initialize the policy evaluator. Must be done by a single thread once and for all
@@ -296,7 +297,7 @@ public final class FlatFileDAORefPolicyProviderModule extends BaseStaticRefPolic
 					try
 					{
 						policyEvaluator = PolicyEvaluators.getInstanceStatic(jaxbPolicySet, null, xacmlParser.getNamespacePrefixUriMap(), refPolicyProviderModule.expressionFactory,
-								refPolicyProviderModule.combiningAlgRegistry, refPolicyProviderModule, policySetRefChain);
+						        refPolicyProviderModule.combiningAlgRegistry, refPolicyProviderModule, policySetRefChain);
 					}
 					catch (final IllegalArgumentException e)
 					{
@@ -321,7 +322,7 @@ public final class FlatFileDAORefPolicyProviderModule extends BaseStaticRefPolic
 
 		@Override
 		public CloseableRefPolicyProvider getInstance(final StaticFlatFileDAORefPolicyProvider conf, final XmlnsFilteringParserFactory xacmlParserFactory, final int maxPolicySetRefDepth,
-				final ExpressionFactory expressionFactory, final CombiningAlgRegistry combiningAlgRegistry, final EnvironmentProperties environmentProperties) throws IllegalArgumentException
+		        final ExpressionFactory expressionFactory, final CombiningAlgRegistry combiningAlgRegistry, final EnvironmentProperties environmentProperties) throws IllegalArgumentException
 		{
 			if (conf == null)
 			{
