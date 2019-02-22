@@ -3,6 +3,20 @@ All notable changes to this project are documented in this file following the [K
 
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
+## 10.1.0
+### Added
+- `EnvironmentProperties#replacePlaceholders()` method now supports system properties and environment variables; and a default value (separated from the property name by '!') if the property is undefined. Therefore, PDP extensions such as Attribute and Policy Providers can accept placeholders for system properties and environment variables in their string configuration parameters (as part of PDP configuration) and perform placeholder replacements with their factory method's input `EnvironmentProperties`. In particular, `policyLocation` elements in PDP's Policy Providers configuration now supports (not only `PARENT_DIR` property but also) system properties and environment variables (enclosed between `${...}`) with default value if property/variable undefined.
+
+### Fixed
+- CVE affecting Spring 4.3.18: upgraded dependencies to depend on
+4.3.20:
+	- authzforce-ce-parent: 7.5.1
+	- authzforce-ce-core: 13.3.1
+		- authzforce-ce-core-pdp-api: 15.3.0
+			- Guava: 24.1.1-jre
+	- authzforce-ce-xacml-json-model: 2.1.1
+- Upgraded java-uuid-generator: 3.1.5
+
 
 ## 10.0.0
 ### Changed
