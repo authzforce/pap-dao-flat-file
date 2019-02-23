@@ -21,7 +21,6 @@
  */
 package org.ow2.authzforce.pap.dao.flatfile;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 import org.ow2.authzforce.core.pap.api.dao.DomainDao;
@@ -30,7 +29,7 @@ import org.ow2.authzforce.core.pap.api.dao.PolicyVersionDaoClient;
 import org.ow2.authzforce.pap.dao.flatfile.xmlns.DomainProperties;
 
 interface FlatFileBasedDomainDao<VERSION_DAO_CLIENT extends PolicyVersionDaoClient, POLICY_DAO_CLIENT extends PolicyDaoClient>
-		extends DomainDao<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>, Closeable
+		extends DomainDao<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT>
 {
 	/**
 	 * Get domain's (internal) unique ID (set by the domains DAO)
