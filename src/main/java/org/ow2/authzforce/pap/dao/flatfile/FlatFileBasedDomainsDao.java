@@ -509,6 +509,8 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 	private static final DecisionRequestPreprocessor.Factory<Request, IndividualXacmlJaxbRequest> DEFAULT_XACML_XML_DECISION_REQUEST_PREPROC_FACTORY = SingleDecisionXacmlJaxbRequestPreprocessor.LaxVariantFactory.INSTANCE;
 	private static final DecisionRequestPreprocessor.Factory<JSONObject, IndividualXacmlJsonRequest> DEFAULT_XACML_JSON_DECISION_REQUEST_PREPROC_FACTORY = SingleDecisionXacmlJsonRequestPreprocessor.LaxVariantFactory.INSTANCE;
 
+	private static final UnsupportedOperationException NULL_PDP_ERROR = new UnsupportedOperationException("PDP internal error. Contact the system or domain administrator.");
+
 	/**
 	 * Initializes a UUID generator that generates UUID version 1. It is thread-safe and uses the host MAC address as the node field if useRandomAddressBasedUUID = false, in which case UUID uniqueness
 	 * across multiple hosts (e.g. in a High-Availability architecture) is guaranteed. If this is used by multiple hosts to generate UUID for common objects (e.g. in a High Availability architecture),
@@ -541,7 +543,7 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 		return Generators.timeBasedGenerator(macAddress);
 	}
 
-	private static class PdpBundle
+	private static final class PdpBundle
 	{
 		private final CloseablePdpEngine engine;
 		private final PdpEngineInoutAdapter<Request, Response> xacmlJaxbIoAdapter;
@@ -583,6 +585,33 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 				return new BaseXacmlJsonResultPostprocessor(clientReqErrVerbosityLevel);
 			}) : null;
 		}
+
+		private boolean isXacmlXmlSupportEnabled()
+		{
+			return xacmlJaxbIoAdapter != null;
+		}
+
+		private boolean isXacmlJsonSupportEnabled()
+		{
+			return xacmlJsonIoAdapter != null;
+		}
+
+		private Response evaluate(final Request request)
+		{
+			assert xacmlJaxbIoAdapter != null;
+			return xacmlJaxbIoAdapter.evaluate(request);
+		}
+
+		private JSONObject evaluate(final JSONObject request)
+		{
+			if (xacmlJsonIoAdapter == null)
+			{
+				throw UNSUPPORTED_XACML_JSON_PROFILE_OPERATION_EXCEPTION;
+			}
+
+			return xacmlJsonIoAdapter.evaluate(request);
+		}
+
 	}
 
 	private final TimeBasedGenerator uuidGen;
@@ -616,13 +645,16 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 	private final PolicyVersionDaoClient.Factory<VERSION_DAO_CLIENT> policyVersionDaoClientFactory;
 
 	/**
-	 * MMust be called this method in a block synchronized on 'domainsRootDir'
+	 * Must be called this method in a block synchronized on 'domainsRootDir'
 	 * 
 	 * @param domainId
 	 *            ID of domain to be removed
 	 */
-	private void removeDomainFromCache(final String domainId) throws IOException
+	private synchronized void removeDomainFromCache(final String domainId) throws IOException
 	{
+		/*
+		 * Assumed called within synchronized(domainsRootDir) block
+		 */
 		assert domainId != null;
 		final DOMAIN_DAO_CLIENT domain = domainMap.remove(domainId);
 		if (domain == null)
@@ -1635,43 +1667,6 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 			}
 		}
 
-		/**
-		 * Returns the PDP enforcing the domain policy
-		 * 
-		 * @return domain PDP
-		 */
-		@Override
-		public PdpEngineInoutAdapter<Request, Response> getXacmlJaxbPdp()
-		{
-			if (this.pdp == null)
-			{
-				return null;
-			}
-
-			return this.pdp.xacmlJaxbIoAdapter;
-		}
-
-		/**
-		 * Returns the PDP enforcing the domain policy
-		 * 
-		 * @return domain PDP
-		 */
-		@Override
-		public PdpEngineInoutAdapter<JSONObject, JSONObject> getXacmlJsonPdp() throws UnsupportedOperationException
-		{
-			if (this.pdp == null)
-			{
-				return null;
-			}
-
-			if (this.pdp.xacmlJsonIoAdapter == null)
-			{
-				throw UNSUPPORTED_XACML_JSON_PROFILE_OPERATION_EXCEPTION;
-			}
-
-			return this.pdp.xacmlJsonIoAdapter;
-		}
-
 		@Override
 		public List<AbstractAttributeProvider> setAttributeProviders(final List<AbstractAttributeProvider> attributeproviders) throws IOException, IllegalArgumentException
 		{
@@ -2648,6 +2643,40 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 			return new PrpRwPropertiesImpl(props.getMaxPolicyCountPerDomain(), props.getMaxVersionCountPerPolicy(), props.isVersionRollingEnabled());
 		}
 
+		@Override
+		public boolean isXacmlXmlSupported()
+		{
+			return pdp.isXacmlXmlSupportEnabled();
+		}
+
+		@Override
+		public boolean isXacmlJsonSupported()
+		{
+			return pdp.isXacmlJsonSupportEnabled();
+		}
+
+		@Override
+		public Response evaluatePolicyDecision(final Request request) throws UnsupportedOperationException
+		{
+			if (pdp == null)
+			{
+				throw NULL_PDP_ERROR;
+			}
+
+			return pdp.evaluate(request);
+		}
+
+		@Override
+		public JSONObject evaluatePolicyDecision(final JSONObject request) throws UnsupportedOperationException
+		{
+			if (pdp == null)
+			{
+				throw NULL_PDP_ERROR;
+			}
+
+			return pdp.evaluate(request);
+		}
+
 	}
 
 	/**
@@ -2656,40 +2685,46 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 	 * @param domainId
 	 * @param domainDirectory
 	 * @param props
-	 *            (optional), specific domain properties, or null if default or no properties should be used
-	 * @return domain DAO client the existing domain if a domain with such ID already exists in the map and properties unchanged ({@code props == null}), else the new domain
+	 *            (optional) specific domain properties, or null if default or no properties should be used
+	 * @return the existing domain if a domain with such ID already exists in the map and properties unchanged ({@code props == null}), else the new domain
 	 * @throws IOException
 	 * @throws IllegalArgumentException
 	 *             if a domain with such ID already exists and {@code props != null}; OR there is an externalId conflict, i.e. the externalId is set in {@code props} but is already associated with
 	 *             another domain (conflict)
 	 */
-	private DOMAIN_DAO_CLIENT addDomainToCacheAfterDirectoryCreated(final String domainId, final Path domainDirectory, final WritableDomainProperties props)
+	private synchronized DOMAIN_DAO_CLIENT addDomainToCacheAfterDirectoryCreated(final String domainId, final Path domainDirectory, final WritableDomainProperties props)
 	        throws IOException, IllegalArgumentException
 	{
-		final FileBasedDomainDaoImpl domainDAO = new FileBasedDomainDaoImpl(domainDirectory, props);
-		final DOMAIN_DAO_CLIENT domainDaoClient = domainDaoClientFactory.getInstance(domainId, domainDAO);
-		final DOMAIN_DAO_CLIENT prevDomain = this.domainMap.putIfAbsent(domainId, domainDaoClient);
-		if (props != null)
+		/*
+		 * Assumed synchronized on domainsRootDir by the caller
+		 */
+		final DOMAIN_DAO_CLIENT prevDomain = this.domainMap.get(domainId);
+		if (prevDomain != null)
 		{
-			if (prevDomain != null)
+			if (props != null)
 			{
 				/*
 				 * Domain already exists (domainId conflict)
 				 */
 				throw new IllegalArgumentException("Domain '" + domainId + "' already exists with possibly different properties than the ones in arguments");
 			}
-
-			// IllegalArgumentException raised if externalId conflict
-			domainDAO.updateCachedExternalId(props.getExternalId());
+			// props == null
+			return prevDomain;
 		}
-		else
-		{
-			if (prevDomain != null)
+		// prevDomain == null
+		final DOMAIN_DAO_CLIENT domainDaoClient = domainDaoClientFactory.getInstance(domainId, () -> {
+			final FileBasedDomainDaoImpl domainDao = new FileBasedDomainDaoImpl(domainDirectory, props);
+			if (props != null)
 			{
-				// return existing domain
-				return prevDomain;
+
+				// IllegalArgumentException raised if externalId conflict
+				domainDao.updateCachedExternalId(props.getExternalId());
 			}
-		}
+
+			return domainDao;
+		});
+
+		this.domainMap.put(domainId, domainDaoClient);
 
 		return domainDaoClient;
 	}
@@ -2812,17 +2847,19 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 				}
 
 				final String domainId = lastPathSegment.toString();
-				FlatFileBasedDomainDao<VERSION_DAO_CLIENT, POLICY_DAO_CLIENT> domainDAO = null;
-				try
-				{
-					domainDAO = new FileBasedDomainDaoImpl(domainPath, null);
-				}
-				catch (final IllegalArgumentException e)
-				{
-					throw new RuntimeException("Invalid domain data for domain '" + domainId + "'", e);
-				}
 
-				final DOMAIN_DAO_CLIENT domain = domainDaoClientFactory.getInstance(domainId, domainDAO);
+				final DOMAIN_DAO_CLIENT domain = domainDaoClientFactory.getInstance(domainId, () -> {
+					try
+					{
+						return new FileBasedDomainDaoImpl(domainPath, null);
+					}
+					catch (final IllegalArgumentException e)
+					{
+						throw new RuntimeException("Invalid domain data for domain '" + domainId + "'", e);
+					}
+
+				});
+
 				domainMap.put(domainId, domain);
 			}
 		}
@@ -2863,26 +2900,28 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 			throw NULL_DOMAIN_ID_ARG_EXCEPTION;
 		}
 
-		final DOMAIN_DAO_CLIENT domain = domainMap.get(domainId);
-		if (domain == null)
+		/*
+		 * Synchronized block two avoid that two threads adding the same desynced domain entry to the map
+		 */
+		synchronized (domainsRootDir)
 		{
-			/*
-			 * check whether domain directory exists (in case it is not synchronized with domain map
-			 */
-			final Path domainDir = this.domainsRootDir.resolve(domainId);
-			/*
-			 * Synchronized block two avoid that two threads adding the same desynced domain entry to the map
-			 */
-			synchronized (domainsRootDir)
+			final DOMAIN_DAO_CLIENT domain = domainMap.get(domainId);
+			if (domain == null)
 			{
+				/*
+				 * check whether domain directory exists (in case it is not synchronized with domain map
+				 */
+				final Path domainDir = this.domainsRootDir.resolve(domainId);
+
 				if (Files.exists(domainDir))
 				{
 					return addDomainToCacheAfterDirectoryCreated(domainId, domainDir, null);
 				}
-			}
-		}
 
-		return domain;
+			}
+
+			return domain;
+		}
 	}
 
 	@Override
@@ -3046,21 +3085,21 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 			throw NULL_DOMAIN_ID_ARG_EXCEPTION;
 		}
 
-		final boolean isMatched = domainMap.containsKey(domainId);
-		if (isMatched)
-		{
-			return true;
-		}
-
-		/*
-		 * check whether domain directory exists (in case it is not synchronized with domain map
-		 */
-		final Path domainDir = this.domainsRootDir.resolve(domainId);
 		/*
 		 * Synchronized block two avoid that two threads adding the same desynced domain entry to the map
 		 */
 		synchronized (domainsRootDir)
 		{
+			final boolean isMatched = domainMap.containsKey(domainId);
+			if (isMatched)
+			{
+				return true;
+			}
+
+			/*
+			 * check whether domain directory exists (in case it is not synchronized with domain map
+			 */
+			final Path domainDir = this.domainsRootDir.resolve(domainId);
 			if (Files.exists(domainDir))
 			{
 				addDomainToCacheAfterDirectoryCreated(domainId, domainDir, null);
