@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright (C) 2012-2019 THALES.
+    Copyright (C) 2012-2020 THALES.
 
     This file is part of AuthzForce CE.
 
@@ -21,8 +21,8 @@
 -->
 <!-- Schema major version is same as VERSION in PDP extension schema namespace http://authzforce.github.io/xmlns/pdp/ext/VERSION. Patch version changes with fixes of errors in the schema. Minor version 
 	changes with other backwards-compatible changes (like Semantic Versioning). -->
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://authzforce.github.io/pap-dao-flat-file/xmlns/pdp-ext/3.6" xmlns="http://authzforce.github.io/pap-dao-flat-file/xmlns/pdp-ext/3.6" xmlns:authz-ext="http://authzforce.github.io/xmlns/pdp/ext/3"
-	xmlns:xacml="urn:oasis:names:tc:xacml:3.0:core:schema:wd-17" elementFormDefault="qualified" attributeFormDefault="unqualified" version="3.6.0">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://authzforce.github.io/pap-dao-flat-file/xmlns/pdp-ext/4" xmlns="http://authzforce.github.io/pap-dao-flat-file/xmlns/pdp-ext/4" xmlns:authz-ext="http://authzforce.github.io/xmlns/pdp/ext/3"
+	xmlns:xacml="urn:oasis:names:tc:xacml:3.0:core:schema:wd-17" elementFormDefault="qualified" attributeFormDefault="unqualified" version="4.0">
 	<xs:import namespace="urn:oasis:names:tc:xacml:3.0:core:schema:wd-17" />
 	<xs:import namespace="http://authzforce.github.io/xmlns/pdp/ext/3" />
 	<xs:annotation>
@@ -37,10 +37,10 @@
 			</p>
 		</xs:documentation>
 	</xs:annotation>
-	<xs:complexType name="StaticFlatFileDAORefPolicyProvider">
+	<xs:complexType name="StaticFlatFileDaoPolicyProvider">
 		<xs:annotation>
 			<xs:documentation>
-				Static Ref Policy Provider for the flat-file-based PAP DAO. This provider expects to find a XACML PolicySet file at ROOT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX.
+				Static Policy Provider for the flat-file-based PAP DAO. This provider expects to find a XACML PolicySet file at ROOT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX.
 				PolicySetId and
 				Version are the respective XACML attributes of the PolicySet. ROOT_DIRECTORY is the root directory where all policies are located, as defined by the 'policyLocation' attribute.
 			</xs:documentation>
