@@ -51,7 +51,7 @@ import org.ow2.authzforce.core.pdp.api.policy.StaticTopLevelPolicyElementEvaluat
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluators;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyMap;
 import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
-import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDaoPolicyProvider;
+import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDaoPolicyProviderDescriptor;
 import org.ow2.authzforce.xacml.identifiers.XacmlStatusCode;
 import org.springframework.util.ResourceUtils;
 
@@ -64,7 +64,7 @@ import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
  * <p>
  * 'base64url' function refers to Base64url encoding specified by RFC 4648, without padding.
  */
-public final class FlatFileDaoPolicyProviderModule extends BaseStaticPolicyProvider
+public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 {
 	private static final IllegalArgumentException NULL_POLICY_LOCATION_PATTERN_ARGUMENT_EXCEPTION = new IllegalArgumentException("policyLocationPattern argument undefined");
 
@@ -113,7 +113,7 @@ public final class FlatFileDaoPolicyProviderModule extends BaseStaticPolicyProvi
 	// policyId -> cache(PolicySets by policy version)
 	private final PolicyMap<PolicyEvaluatorSupplier> policyCache;
 
-	private FlatFileDaoPolicyProviderModule(final Path policyParentDirectory, final String suffix, final XmlnsFilteringParserFactory xacmlParserFactory, final ExpressionFactory expressionFactory,
+	private FlatFileDaoPolicyProvider(final Path policyParentDirectory, final String suffix, final XmlnsFilteringParserFactory xacmlParserFactory, final ExpressionFactory expressionFactory,
 	        final CombiningAlgRegistry combiningAlgRegistry, final int maxPolicySetRefDepth) throws IllegalArgumentException
 	{
 		super(maxPolicySetRefDepth);
@@ -266,7 +266,7 @@ public final class FlatFileDaoPolicyProviderModule extends BaseStaticPolicyProvi
 			this.policyFilepath = policyFilepath;
 		}
 
-		private StaticTopLevelPolicyElementEvaluator get(final FlatFileDaoPolicyProviderModule policyProviderModule, final Deque<String> policySetRefChain) throws IndeterminateEvaluationException
+		private StaticTopLevelPolicyElementEvaluator get(final FlatFileDaoPolicyProvider policyProviderModule, final Deque<String> policySetRefChain) throws IndeterminateEvaluationException
 		{
 			/*
 			 * Prevent simulatenous attemps to initialize the policy evaluator. Must be done by a single thread once and for all
@@ -315,14 +315,14 @@ public final class FlatFileDaoPolicyProviderModule extends BaseStaticPolicyProvi
 	 * Module factory
 	 *
 	 */
-	public static final class Factory extends CloseablePolicyProvider.Factory<StaticFlatFileDaoPolicyProvider>
+	public static final class Factory extends CloseablePolicyProvider.Factory<StaticFlatFileDaoPolicyProviderDescriptor>
 	{
 		private static final IllegalArgumentException ILLEGAL_COMBINING_ALG_REGISTRY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Undefined CombiningAlgorithm registry");
 		private static final IllegalArgumentException ILLEGAL_EXPRESSION_FACTORY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Undefined Expression factory");
 		private static final IllegalArgumentException ILLEGAL_XACML_PARSER_FACTORY_ARGUMENT_EXCEPTION = new IllegalArgumentException("Undefined XACML parser factory");
 
 		@Override
-		public CloseablePolicyProvider<?> getInstance(final StaticFlatFileDaoPolicyProvider conf, final XmlnsFilteringParserFactory xacmlParserFactory, final int maxPolicySetRefDepth,
+		public CloseablePolicyProvider<?> getInstance(final StaticFlatFileDaoPolicyProviderDescriptor conf, final XmlnsFilteringParserFactory xacmlParserFactory, final int maxPolicySetRefDepth,
 		        final ExpressionFactory expressionFactory, final CombiningAlgRegistry combiningAlgRegistry, final EnvironmentProperties environmentProperties,
 		        final Optional<PolicyProvider<?>> otherHelpingPolicyProvider) throws IllegalArgumentException
 		{
@@ -348,13 +348,13 @@ public final class FlatFileDaoPolicyProviderModule extends BaseStaticPolicyProvi
 
 			final String policyLocationPattern = environmentProperties.replacePlaceholders(conf.getPolicyLocationPattern());
 			final Entry<Path, String> result = validateConf(policyLocationPattern);
-			return new FlatFileDaoPolicyProviderModule(result.getKey(), result.getValue(), xacmlParserFactory, expressionFactory, combiningAlgRegistry, maxPolicySetRefDepth);
+			return new FlatFileDaoPolicyProvider(result.getKey(), result.getValue(), xacmlParserFactory, expressionFactory, combiningAlgRegistry, maxPolicySetRefDepth);
 		}
 
 		@Override
-		public Class<StaticFlatFileDaoPolicyProvider> getJaxbClass()
+		public Class<StaticFlatFileDaoPolicyProviderDescriptor> getJaxbClass()
 		{
-			return StaticFlatFileDaoPolicyProvider.class;
+			return StaticFlatFileDaoPolicyProviderDescriptor.class;
 		}
 
 	}

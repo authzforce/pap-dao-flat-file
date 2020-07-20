@@ -37,10 +37,10 @@
 			</p>
 		</xs:documentation>
 	</xs:annotation>
-	<xs:complexType name="StaticFlatFileDaoPolicyProvider">
+	<xs:complexType name="StaticFlatFileDaoPolicyProviderDescriptor">
 		<xs:annotation>
 			<xs:documentation>
-				Static Policy Provider for the flat-file-based PAP DAO. This provider expects to find a XACML PolicySet file at ROOT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX.
+				Static Policy Provider configuration for FlatFileDaoPolicyProvider instances. Such provider expects to find a XACML PolicySet file at ROOT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX.
 				PolicySetId and
 				Version are the respective XACML attributes of the PolicySet. ROOT_DIRECTORY is the root directory where all policies are located, as defined by the 'policyLocation' attribute.
 			</xs:documentation>
