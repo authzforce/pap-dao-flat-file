@@ -3,6 +3,32 @@ All notable changes to this project are documented in this file following the [K
 
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
+
+##12.0.0
+### Changed
+- Upgraded parent project: 7.6.1
+- Upgraded dependency
+	- authzforce-ce-core-pdp-engine: 16.0.0: simplified Policy Provider architecture
+		- PDP configuration schema changes (XML Schema 'pdp.xsd') v7.0.0 (more info in [migration guide](https://github.com/authzforce/core/blob/develop/MIGRATION.md) )
+			- Simplified namespace (removed minor version) to `http://authzforce.github.io/core/xmlns/pdp/7`
+			- Replaced 'refPolicyProvider' and 'rootPolicyProvider' XML elements with 'policyProvider' and 'rootPolicyRef' (optional). If 'rootPolicyRef' undefined, the new `PolicyProvider#getCandidateRootPolicy()` method is called to determine a possible root policy.
+		- Policy Provider API changes
+	- java-uuid-generator: 4.0.1
+	- authzforce-ce-core-pap-api: 10.1.0
+- Changed namespace of extension XML schema: `http://authzforce.github.io/pap-dao-flat-file/xmlns/pdp-ext/4`
+- Renamed XML type 'StaticFlatFileDAORefPolicyProvider' to 'StaticFlatFileDaoPolicyProviderDescriptor' in extension XML schema
+- Renamed class FlatFileDAORefPolicyProviderModule to FlatFileDaoPolicyProvider
+- FlatFileDaoPolicyProvider implements new PolicyProvider API (class BaseStaticPolicyProvider and class CloseablePolicyProvider.Factory)
+- FlatFileBasedDomainsDao: support new PDP configuration schema changes
+
+
+## Added
+- Support for **Multiple Decision Profile when used with XACML/JSON Profile** (authzforce-ce-core-pdp-engine upgrade) 
+
+## Fixed
+- Issue (related to [authzforce-ce-server issue](https://github.com/authzforce/server/issues/46) ) in `addPolicy()` with bad PolicySets being added and saved to filesystem despite the IllegalArgumentException (or other exception) raised. Any PolicySet input to addPolicy() is now fully validated by attempting to load it as root policy in a PDP before saving it.
+
+
 ## 11.0.0
 ### Changed
 - Major PAP API (extended Java interface) version upgrade: authzforce-ce-core-pap-api v10.0.0

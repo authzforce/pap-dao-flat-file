@@ -130,7 +130,7 @@ import org.ow2.authzforce.core.xmlns.pdp.StaticPolicyProvider;
 import org.ow2.authzforce.core.xmlns.pdp.TopLevelPolicyElementRef;
 import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
 import org.ow2.authzforce.pap.dao.flatfile.xmlns.DomainProperties;
-import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDaoPolicyProvider;
+import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDaoPolicyProviderDescriptor;
 import org.ow2.authzforce.xacml.Xacml3JaxbHelper;
 import org.ow2.authzforce.xmlns.pdp.ext.AbstractAttributeProvider;
 import org.ow2.authzforce.xmlns.pdp.ext.AbstractPolicyProvider;
@@ -833,17 +833,17 @@ public final class FlatFileBasedDomainsDao<VERSION_DAO_CLIENT extends PolicyVers
 			 */
 			final List<AbstractPolicyProvider> policyProviders = pdpConf.getPolicyProviders();
 			final AbstractPolicyProvider policyProvider;
-			if (policyProviders.size() != 1 || !((policyProvider = policyProviders.get(0)) instanceof StaticFlatFileDaoPolicyProvider))
+			if (policyProviders.size() != 1 || !((policyProvider = policyProviders.get(0)) instanceof StaticFlatFileDaoPolicyProviderDescriptor))
 			{
 				// critical error
 				throw new RuntimeException("Invalid PDP configuration of domain '" + domainId + "' in file '" + pdpConfFile + "': there is not exactly one policyProvider or it is not an instance of "
-				        + StaticFlatFileDaoPolicyProvider.class + " as expected.");
+				        + StaticFlatFileDaoPolicyProviderDescriptor.class + " as expected.");
 			}
 
-			final StaticFlatFileDaoPolicyProvider fileBasedPolicyProvider = (StaticFlatFileDaoPolicyProvider) policyProvider;
+			final StaticFlatFileDaoPolicyProviderDescriptor fileBasedPolicyProvider = (StaticFlatFileDaoPolicyProviderDescriptor) policyProvider;
 			// replace any ${PARENT_DIR} placeholder in policy location pattern
 			final String policyLocation = pdpConfEnvProps.replacePlaceholders(fileBasedPolicyProvider.getPolicyLocationPattern());
-			final Entry<Path, String> result = FlatFileDaoPolicyProviderModule.validateConf(policyLocation);
+			final Entry<Path, String> result = FlatFileDaoPolicyProvider.validateConf(policyLocation);
 			this.policyParentDirPath = result.getKey();
 			FlatFileDAOUtils.checkFile("Domain policies directory", policyParentDirPath, true, true);
 
