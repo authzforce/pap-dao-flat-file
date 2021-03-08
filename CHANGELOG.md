@@ -4,7 +4,23 @@ All notable changes to this project are documented in this file following the [K
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
 
-##12.0.0
+## 13.0.0
+### Changed
+- Upgraded parent project to 8.0.0: full switch to Java 11 support (Java 8 no longer supported)
+- Upgraded authzforce-ce-core-pdp-* dependencies to 17.1.0:
+  - Upgraded JAXB (Jakarta XML Bining) to v2.3.3
+  - Upgraded authzforce-ce-core-pdp-api to v18.0.1 (fixes issue authzforce/server#62 : same XML namespace prefix cannot be reused in more than one namespace declaration when parsing XACML documents with `XmlUtils$SAXBasedXmlnsFilteringParser`)
+  - Upgraded authzforce-ce-xacml-json-model: 3.0.1 (fixed issue with method `XacmlJsonUtils#canonicalizeResponse()` when comparing similar XACML/JSON responses, linked to https://github.com/stleary/JSON-java/issues/589 )
+- upgraded authzforce-ce-core-pap-api to 11.0.0
+
+### Added
+- XACML JSON Profile feature: support for JSON Objects in XACML/JSON Attribute Values (linked to issue authzforce/server#61 ), allowing for complex structures (JSON objects) as data types
+
+### Fixed
+- Fixed CVE on jackson-databind -> v2.9.10.8
+
+
+## 12.0.0
 ### Changed
 - Upgraded parent project: 7.6.1
 - Upgraded dependency
@@ -157,7 +173,7 @@ https://google.github.io/styleguide/javaguide.html#s5.3-camel-case)
 * Security issues reported by Find Security Bugs plugin
 
 
-# 6.1.0
+## 6.1.0
 ### Fixed
 - Other issues reported by Codacy
 
