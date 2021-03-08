@@ -3,7 +3,7 @@
    <parent>
       <groupId>org.ow2.authzforce</groupId>
       <artifactId>authzforce-ce-parent</artifactId>
-      <version>7.6.1</version>
+      <version>8.0.0</version>
    </parent>
    <artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
    <!-- Version must be >= authzforce-ce-core-pap-api dependency -->
@@ -19,7 +19,7 @@
       <url>${git.url.base}/pap-dao-flat-file</url>
    </scm>
    <properties>
-      <authzforce-ce.core.version>16.0.0</authzforce-ce.core.version>
+      <authzforce-ce.core.version>17.1.0</authzforce-ce.core.version>
    </properties>
    <repositories>
       <repository>
@@ -39,7 +39,7 @@
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>authzforce-ce-core-pap-api</artifactId>
-         <version>10.1.0</version>
+         <version>11.0.0</version>
       </dependency>
       <dependency>
          <groupId>${project.groupId}</groupId>
@@ -120,11 +120,8 @@
             </executions>
          </plugin>
          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>findbugs-maven-plugin</artifactId>
-            <configuration>
-               <excludeFilterFile>findbugs-exclude-filter.xml</excludeFilterFile>
-            </configuration>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs-maven-plugin</artifactId>
             <executions>
                <execution>
                   <phase>verify</phase>
@@ -155,8 +152,11 @@
             <artifactId>license-maven-plugin</artifactId>
             <configuration>
                <header>license/thales-gpl.header.txt</header>
+               <headerDefinitions>
+                  <headerDefinition>license/header-defs.xml</headerDefinition>
+               </headerDefinitions>
                <includes>
-                  <include>src/**</include>
+                  <include>src/main/java/**</include>
                </includes>
             </configuration>
             <executions>

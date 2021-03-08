@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2012-2020 THALES.
+/*
+ * Copyright (C) 2012-2021 THALES.
  *
  * This file is part of AuthzForce CE.
  *
@@ -184,7 +184,7 @@ public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 	}
 
 	@Override
-	public StaticTopLevelPolicyElementEvaluator getPolicy(final String id, final Optional<PolicyVersionPatterns> versionPatterns) throws IndeterminateEvaluationException
+	public StaticTopLevelPolicyElementEvaluator getPolicy(final String id, final Optional<PolicyVersionPatterns> versionPatterns)
 	{
 		/*
 		 * PolicyIdReferences not supported
@@ -244,7 +244,7 @@ public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 	}
 
 	@Override
-	public void close() throws IOException
+	public void close()
 	{
 		/*
 		 * The policyCache has been made immutable so we cannot call the clear() method
