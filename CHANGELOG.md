@@ -10,7 +10,7 @@ Issues reported on [GitHub](https://github.com/authzforce/core/issues) are refer
 - Upgraded authzforce-ce-core-pdp-* dependencies to 17.1.0:
   - Upgraded JAXB (Jakarta XML Bining) to v2.3.3
   - Upgraded authzforce-ce-core-pdp-api to v18.0.1 (fixes issue authzforce/server#62 : same XML namespace prefix cannot be reused in more than one namespace declaration when parsing XACML documents with `XmlUtils$SAXBasedXmlnsFilteringParser`)
-  - Upgraded authzforce-ce-xacml-json-model: 3.0.1 (fixed issue with method `XacmlJsonUtils#canonicalizeResponse()` when comparing similar XACML/JSON responses, linked to https://github.com/stleary/JSON-java/issues/589 )
+  - Upgraded authzforce-ce-xacml-json-model: 3.0.2 (fixed issue with method `XacmlJsonUtils#canonicalizeResponse()` when comparing similar XACML/JSON responses, linked to https://github.com/stleary/JSON-java/issues/589 )
 - upgraded authzforce-ce-core-pap-api to 11.0.0
 
 ### Added
