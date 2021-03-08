@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2012-2020 THALES.
+/*
+ * Copyright (C) 2012-2021 THALES.
  *
  * This file is part of AuthzForce CE.
  *
@@ -18,20 +18,20 @@
  */
 package org.ow2.authzforce.pap.dao.flatfile;
 
+import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
+import org.ow2.authzforce.core.pdp.api.HashCollections;
+import org.ow2.authzforce.core.pdp.api.XmlUtils.NoXmlnsFilteringParser;
+import org.ow2.authzforce.core.pdp.api.XmlUtils.XmlnsFilteringParser;
+import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
+import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
+import org.ow2.authzforce.xacml.Xacml3JaxbHelper;
+
+import javax.xml.bind.JAXBException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.FileSystems;
-import java.nio.file.FileVisitOption;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.PathMatcher;
-import java.nio.file.SimpleFileVisitor;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Base64;
@@ -39,17 +39,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-
-import javax.xml.bind.JAXBException;
-
-import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
-
-import org.ow2.authzforce.core.pdp.api.HashCollections;
-import org.ow2.authzforce.core.pdp.api.XmlUtils.NoXmlnsFilteringParser;
-import org.ow2.authzforce.core.pdp.api.XmlUtils.XmlnsFilteringParser;
-import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
-import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
-import org.ow2.authzforce.xacml.Xacml3JaxbHelper;
 
 /**
  * Utility methods
@@ -173,15 +162,7 @@ public final class FlatFileDAOUtils
 	 * Directory entry filter that accepts only sub-directories
 	 *
 	 */
-	public static final DirectoryStream.Filter<Path> SUB_DIRECTORY_STREAM_FILTER = new DirectoryStream.Filter<Path>()
-	{
-
-		@Override
-		public boolean accept(final Path entry) throws IOException
-		{
-			return Files.isDirectory(entry);
-		}
-	};
+	public static final DirectoryStream.Filter<Path> SUB_DIRECTORY_STREAM_FILTER = Files::isDirectory;
 
 	/**
 	 * Directory entry filter that accepts only regular files with a given extension/suffix
@@ -215,7 +196,7 @@ public final class FlatFileDAOUtils
 		}
 
 		@Override
-		public boolean accept(final Path entry) throws IOException
+		public boolean accept(final Path entry)
 		{
 			return Files.isRegularFile(entry) && pathSuffixMatcher.matches(entry.getFileName());
 		}
@@ -259,7 +240,7 @@ public final class FlatFileDAOUtils
 		}
 	}
 
-	private static FileVisitor<Path> DELETING_FILE_VISITOR = new SimpleFileVisitor<Path>()
+	private static final FileVisitor<Path> DELETING_FILE_VISITOR = new SimpleFileVisitor<>()
 	{
 		@Override
 		public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) throws IOException
@@ -304,7 +285,7 @@ public final class FlatFileDAOUtils
 	 */
 	public static void copyDirectory(final Path source, final Path target, final int maxDepth) throws IOException, IllegalArgumentException
 	{
-		Files.walkFileTree(source, Collections.<FileVisitOption> emptySet(), maxDepth, new CopyingFileVisitor(source, target));
+		Files.walkFileTree(source, Collections.emptySet(), maxDepth, new CopyingFileVisitor(source, target));
 	}
 
 	/**
@@ -323,7 +304,7 @@ public final class FlatFileDAOUtils
 	 */
 	public static void deleteDirectory(final Path dir, final int maxDepth) throws IOException, IllegalArgumentException
 	{
-		Files.walkFileTree(dir, Collections.<FileVisitOption> emptySet(), maxDepth, DELETING_FILE_VISITOR);
+		Files.walkFileTree(dir, Collections.emptySet(), maxDepth, DELETING_FILE_VISITOR);
 	}
 
 	/**
@@ -431,10 +412,6 @@ public final class FlatFileDAOUtils
 			}
 			return new SimpleImmutableEntry<>(latestVersion, latestFilepath);
 		}
-		catch (final IOException e)
-		{
-			throw e;
-		}
 	}
 
 	/**
@@ -471,10 +448,6 @@ public final class FlatFileDAOUtils
 				final PolicyVersion version = new PolicyVersion(versionId);
 				versions.put(version, policyVersionFilePath);
 			}
-		}
-		catch (final IOException e)
-		{
-			throw e;
 		}
 
 		return new PolicyVersions<>(versions);

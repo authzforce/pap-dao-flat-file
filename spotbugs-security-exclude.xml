@@ -11,4 +11,11 @@
    -->
     <Bug pattern="CRLF_INJECTION_LOGS" />
   </Match>
+  <Match>
+    <!-- Spotbugs issue: https://github.com/spotbugs/spotbugs/issues/756 -->
+    <Bug pattern="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE" />
+  </Match>
+  <Match>
+    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD" />
+  </Match>
 </FindBugsFilter>
