@@ -4,12 +4,18 @@ All notable changes to this project are documented in this file following the [K
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
 
+## 13.0.2
+### Fixed
+- CVE-2021-22696 and CVE-2021-3046 fixed by upgrading **authzforce-ce-parent to v8.0.3**
+- Upgraded authzforce-ce-core-pdp-engine to 17.1.2
+- Fix for authzforce/server#64 - loading JSON schemas in offline mode
+    - Upgraded dependency authzforce-ce-xacml-json-model to 3.0.4
+
+
 ## 13.0.1
 ### Fixed
 - CVE-2021-22118: updated Spring version to 5.2.15
   - Upgraded parent to v8.0.2
-- Fix for authzforce/server#64 - loading JSON schemas in offline mode
-  - Upgraded dependency authzforce-ce-xacml-json-model to 3.0.3
 - Dependency fixes:
   - Upgraded, dependencies authzforce-ce-core-pdp-engine to 17.1.1 
   - Upgraded authzforce-ce-core-pap-api to 11.0.1 
