@@ -3,7 +3,7 @@
    <parent>
       <groupId>org.ow2.authzforce</groupId>
       <artifactId>authzforce-ce-parent</artifactId>
-      <version>8.0.2</version>
+      <version>8.0.3</version>
    </parent>
    <artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
    <!-- Version must be >= authzforce-ce-core-pap-api dependency -->
@@ -19,7 +19,7 @@
       <url>${git.url.base}/pap-dao-flat-file</url>
    </scm>
    <properties>
-      <authzforce-ce.core.version>17.1.1</authzforce-ce.core.version>
+      <authzforce-ce.core.version>17.1.2</authzforce-ce.core.version>
    </properties>
    <repositories>
       <repository>
