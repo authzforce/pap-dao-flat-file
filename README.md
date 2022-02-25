@@ -1,6 +1,6 @@
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/51ef02d9c2214a74b8bb1dc6ed77b912)](https://www.codacy.com/app/coder103/pap-dao-flat-file?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=authzforce/pap-dao-flat-file&amp;utm_campaign=Badge_Grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/a5057c24f42c48909f7f2c64e01f7d90)](https://www.codacy.com/gh/authzforce/pap-dao-flat-file/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=authzforce/pap-dao-flat-file&amp;utm_campaign=Badge_Grade)
 
-# AuthZForce Flat-File-based DAO
+# AuthzForce Flat-File-based DAO
 AuthZForce PAP (Policy Administration Point) DAO (Data Access Object) implementation based on flat file database
 
 ## Support
@@ -14,4 +14,4 @@ Please include as much information as possible; the more we know, the better the
 * Log output can be useful too; sometimes enabling DEBUG logging can help;
 * Your code & configuration files are often useful.
 
-If you wish to contact the developers for other reasons, use [Authzforce contact mailing list](http://scr.im/azteam).
+If you wish to contact the developers for other reasons, use [AuthzForce contact mailing list](http://scr.im/azteam).
