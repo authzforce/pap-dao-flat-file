@@ -57,10 +57,10 @@ Issues reported on [GitHub](https://github.com/authzforce/core/issues) are refer
 - FlatFileBasedDomainsDao: support new PDP configuration schema changes
 
 
-## Added
+### Added
 - Support for **Multiple Decision Profile when used with XACML/JSON Profile** (authzforce-ce-core-pdp-engine upgrade) 
 
-## Fixed
+### Fixed
 - Issue (related to [authzforce-ce-server issue](https://github.com/authzforce/server/issues/46) ) in `addPolicy()` with bad PolicySets being added and saved to filesystem despite the IllegalArgumentException (or other exception) raised. Any PolicySet input to addPolicy() is now fully validated by attempting to load it as root policy in a PDP before saving it.
 
 

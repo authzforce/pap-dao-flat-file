@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2021 THALES.
+ * Copyright (C) 2012-2022 THALES.
  *
  * This file is part of AuthzForce CE.
  *
@@ -18,6 +18,22 @@
  */
 package org.ow2.authzforce.pap.dao.flatfile;
 
+import org.ow2.authzforce.core.pap.api.dao.AuthzPolicy;
+import org.ow2.authzforce.core.pdp.api.EnvironmentProperties;
+import org.ow2.authzforce.core.pdp.api.HashCollections;
+import org.ow2.authzforce.core.pdp.api.IndeterminateEvaluationException;
+import org.ow2.authzforce.core.pdp.api.XmlUtils.XmlnsFilteringParserFactory;
+import org.ow2.authzforce.core.pdp.api.combining.CombiningAlgRegistry;
+import org.ow2.authzforce.core.pdp.api.expression.ExpressionFactory;
+import org.ow2.authzforce.core.pdp.api.policy.*;
+import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluators;
+import org.ow2.authzforce.core.pdp.impl.policy.PolicyMap;
+import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
+import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDaoPolicyProviderDescriptor;
+import org.ow2.authzforce.xacml.identifiers.XacmlStatusCode;
+import org.springframework.util.ResourceUtils;
+
+import javax.xml.bind.JAXBException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -31,31 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-
-import javax.xml.bind.JAXBException;
-
-import org.ow2.authzforce.core.pdp.api.EnvironmentProperties;
-import org.ow2.authzforce.core.pdp.api.HashCollections;
-import org.ow2.authzforce.core.pdp.api.IndeterminateEvaluationException;
-import org.ow2.authzforce.core.pdp.api.XmlUtils.XmlnsFilteringParser;
-import org.ow2.authzforce.core.pdp.api.XmlUtils.XmlnsFilteringParserFactory;
-import org.ow2.authzforce.core.pdp.api.combining.CombiningAlgRegistry;
-import org.ow2.authzforce.core.pdp.api.expression.ExpressionFactory;
-import org.ow2.authzforce.core.pdp.api.policy.BaseStaticPolicyProvider;
-import org.ow2.authzforce.core.pdp.api.policy.CloseablePolicyProvider;
-import org.ow2.authzforce.core.pdp.api.policy.PolicyProvider;
-import org.ow2.authzforce.core.pdp.api.policy.PolicyRefsMetadata;
-import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
-import org.ow2.authzforce.core.pdp.api.policy.PolicyVersionPatterns;
-import org.ow2.authzforce.core.pdp.api.policy.StaticTopLevelPolicyElementEvaluator;
-import org.ow2.authzforce.core.pdp.impl.policy.PolicyEvaluators;
-import org.ow2.authzforce.core.pdp.impl.policy.PolicyMap;
-import org.ow2.authzforce.pap.dao.flatfile.FlatFileDAOUtils.SuffixMatchingDirectoryStreamFilter;
-import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDaoPolicyProviderDescriptor;
-import org.ow2.authzforce.xacml.identifiers.XacmlStatusCode;
-import org.springframework.util.ResourceUtils;
-
-import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
 
 /**
  * Static Policy Provider for the File-based PAP DAO. This provider expects to find a XACML PolicySet file at PARENT_DIRECTORY/base64url(${PolicySetId})/${Version}SUFFIX. PolicySetId and Version are
@@ -107,7 +98,6 @@ public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 		return new SimpleImmutableEntry<>(policyParentDirectory, suffix);
 	}
 
-	private final XmlnsFilteringParserFactory xacmlParserFactory;
 	private final ExpressionFactory expressionFactory;
 	private final CombiningAlgRegistry combiningAlgRegistry;
 	// policyId -> cache(PolicySets by policy version)
@@ -126,7 +116,7 @@ public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 		final Map<String, Map<PolicyVersion, PolicyEvaluatorSupplier>> updatablePolicyMap = HashCollections.newUpdatableMap();
 		// filter matching specifc file suffix for policy files
 		final Filter<? super Path> policyFilenameSuffixMatchingDirStreamFilter = new SuffixMatchingDirectoryStreamFilter(suffix);
-		try (final DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirectory, FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
+		try (DirectoryStream<Path> policyParentDirStream = Files.newDirectoryStream(policyParentDirectory, FlatFileDAOUtils.SUB_DIRECTORY_STREAM_FILTER))
 		{
 			// Browse directories of policies, one for each policy ID
 			for (final Path policyVersionsDir : policyParentDirStream)
@@ -154,7 +144,7 @@ public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 				final Map<PolicyVersion, PolicyEvaluatorSupplier> policySetSuppliersByVersion = HashCollections.newUpdatableMap();
 				// Browse policy versions, one policy file for each version of
 				// the current policy
-				try (final DirectoryStream<Path> policyVersionsDirStream = Files.newDirectoryStream(policyVersionsDir, policyFilenameSuffixMatchingDirStreamFilter))
+				try (DirectoryStream<Path> policyVersionsDirStream = Files.newDirectoryStream(policyVersionsDir, policyFilenameSuffixMatchingDirStreamFilter))
 				{
 					for (final Path policyVersionFile : policyVersionsDirStream)
 					{
@@ -178,7 +168,6 @@ public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 		}
 
 		this.policyCache = new PolicyMap<>(updatablePolicyMap);
-		this.xacmlParserFactory = xacmlParserFactory;
 		this.expressionFactory = expressionFactory;
 		this.combiningAlgRegistry = combiningAlgRegistry;
 	}
@@ -280,12 +269,10 @@ public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 						throw new IndeterminateEvaluationException("Unable to find PolicySet file: " + policyFilepath, XacmlStatusCode.PROCESSING_ERROR.value());
 					}
 
-					final XmlnsFilteringParser xacmlParser;
-					final PolicySet jaxbPolicySet;
+					final AuthzPolicy authzPolicy;
 					try
 					{
-						xacmlParser = policyProviderModule.xacmlParserFactory.getInstance();
-						jaxbPolicySet = FlatFileDAOUtils.loadPolicy(policyFilepath, xacmlParser);
+						authzPolicy = FlatFileDAOUtils.loadPolicy(policyFilepath);
 					}
 					catch (final IllegalArgumentException e)
 					{
@@ -297,8 +284,8 @@ public final class FlatFileDaoPolicyProvider extends BaseStaticPolicyProvider
 					}
 					try
 					{
-						policyEvaluator = PolicyEvaluators.getInstanceStatic(jaxbPolicySet, null, xacmlParser.getNamespacePrefixUriMap(), policyProviderModule.expressionFactory,
-						        policyProviderModule.combiningAlgRegistry, policyProviderModule, policySetRefChain);
+						policyEvaluator = PolicyEvaluators.getInstanceStatic(authzPolicy.toXacml(), policyProviderModule.expressionFactory,  policyProviderModule.combiningAlgRegistry, policyProviderModule,
+								policySetRefChain, Optional.empty(), authzPolicy.getXPathNamespaceContexts());
 					}
 					catch (final IllegalArgumentException e)
 					{

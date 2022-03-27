@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2021 THALES.
+ * Copyright (C) 2012-2022 THALES.
  *
  * This file is part of AuthzForce CE.
  *
@@ -19,8 +19,10 @@
 package org.ow2.authzforce.pap.dao.flatfile;
 
 import oasis.names.tc.xacml._3_0.core.schema.wd_17.PolicySet;
+import org.ow2.authzforce.core.pap.api.dao.AuthzPolicy;
+import org.ow2.authzforce.core.pap.api.dao.JaxbXacmlAuthzPolicy;
 import org.ow2.authzforce.core.pdp.api.HashCollections;
-import org.ow2.authzforce.core.pdp.api.XmlUtils.NoXmlnsFilteringParser;
+import org.ow2.authzforce.core.pdp.api.XmlUtils;
 import org.ow2.authzforce.core.pdp.api.XmlUtils.XmlnsFilteringParser;
 import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
@@ -312,15 +314,13 @@ public final class FlatFileDAOUtils
 	 * 
 	 * @param policyFilepath
 	 *            policy file
-	 * @param xacmlParser
-	 *            XACML parser; or null if the default should be used (same as {@link #loadPolicy(Path)})
 	 * @return JAXB-annotated XACML PolicySet
 	 * @throws IllegalArgumentException
 	 *             if {@code policyFilepath} does not exist or the file content is not a PolicySet
 	 * @throws JAXBException
 	 *             error parsing XACML policy file into JAXB PolicySet
 	 */
-	public static PolicySet loadPolicy(final Path policyFilepath, final XmlnsFilteringParser xacmlParser) throws IllegalArgumentException, JAXBException
+	public static AuthzPolicy loadPolicy(final Path policyFilepath) throws IllegalArgumentException, JAXBException
 	{
 		final URL policyURL;
 		try
@@ -332,7 +332,7 @@ public final class FlatFileDAOUtils
 			throw new IllegalArgumentException("Failed to locate policy file: " + policyFilepath, e);
 		}
 
-		final XmlnsFilteringParser nonNullXacmlParser = xacmlParser == null ? new NoXmlnsFilteringParser(Xacml3JaxbHelper.createXacml3Unmarshaller()) : xacmlParser;
+		final XmlnsFilteringParser nonNullXacmlParser = new XmlUtils.SAXBasedXmlnsFilteringParser(Xacml3JaxbHelper.createXacml3Unmarshaller());
 		final Object jaxbPolicyOrPolicySetObj;
 		try
 		{
@@ -353,23 +353,7 @@ public final class FlatFileDAOUtils
 
 		}
 
-		return (PolicySet) jaxbPolicyOrPolicySetObj;
-	}
-
-	/**
-	 * Get/load policy from file
-	 * 
-	 * @param policyFilepath
-	 *            policy file
-	 * @return JAXB-annotated XACML PolicySet
-	 * @throws IllegalArgumentException
-	 *             if {@code policyFilepath} does not exist or the file content is not a PolicySet
-	 * @throws JAXBException
-	 *             error parsing XACML policy file into JAXB PolicySet
-	 */
-	public static PolicySet loadPolicy(final Path policyFilepath) throws IllegalArgumentException, JAXBException
-	{
-		return loadPolicy(policyFilepath, null);
+		return new JaxbXacmlAuthzPolicy((PolicySet) jaxbPolicyOrPolicySetObj, nonNullXacmlParser.getNamespacePrefixUriMap());
 	}
 
 	/**
@@ -388,7 +372,7 @@ public final class FlatFileDAOUtils
 	 */
 	public static Entry<PolicyVersion, Path> getLatestPolicyVersion(final Path versionsDirectory, final SuffixMatchingDirectoryStreamFilter filenameSuffixMatchingFilter) throws IOException
 	{
-		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(Objects.requireNonNull(versionsDirectory, "Undefined versionsDirectory"),
+		try (DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(Objects.requireNonNull(versionsDirectory, "Undefined versionsDirectory"),
 				Objects.requireNonNull(filenameSuffixMatchingFilter, "Undefined filenameSuffixMatchingFilter")))
 		{
 			PolicyVersion latestVersion = null;
@@ -433,7 +417,7 @@ public final class FlatFileDAOUtils
 		Objects.requireNonNull(versionsDirectory, "Undefined versionsDirectory");
 		Objects.requireNonNull(versionsDirectory, "Undefined filenameSuffixMatchingFilter");
 		final Map<PolicyVersion, Path> versions = HashCollections.newUpdatableMap();
-		try (final DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(versionsDirectory, filenameSuffixMatchingFilter))
+		try (DirectoryStream<Path> policyDirStream = Files.newDirectoryStream(versionsDirectory, filenameSuffixMatchingFilter))
 		{
 			for (final Path policyVersionFilePath : policyDirStream)
 			{
