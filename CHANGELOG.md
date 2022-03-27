@@ -4,6 +4,40 @@ All notable changes to this project are documented in this file following the [K
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
 
+## 14.0.0
+### Changed
+- Upgraded dependency: authzforce-ce-core-pap-api to 12.0.0: API changes
+
+  - New `AuthzPolicy` interface replacing (XACML-schema-derived JAXB-annotated) `PolicySet` in API operations, as a more generic policy type.
+  - Upgraded dependency authzforce-ce-core-pdp-api to 21.2.0
+  
+    - Improved support of Multiple Decision Profile in following PDP extensions: Combining Algorithm, Function, Attribute Provider, Policy Provider (new methods and new optional `EvaluationContext` parameter for the MDP evaluation context).
+    - Changed Datatype extension (`AttributeValueFactory`) , `EvaluationContext`, `VariableReference` and `ExpressionFactory` interfaces to better support XPath evaluation (e.g. AttributeSelector)
+    - For better support of standard `current-dateTime/date/time` attributes and better request logging, `DecisionRequest` and `EvaluationContext` interfaces have a new method `getCreationTimestamp()` that must provide the date/time of the request/context creation.
+    - Changed Request preprocessor interface to better support namespace-aware XPath evaluation
+    - New `XMLUtils.SAXBasedXmlnsFilteringParser` class constructor parameter - XML namespace prefix-to-URI mappings - to help fix the issue authzforce/server#66 .
+    - Added `JaxbXacmlAuthzPolicy` class as default `AuthzPolicy` implementation based on schema-derived JAXB-annotated `PolicySet` class
+- Upgraded dependency: authzforce-ce-core-pdp-engine to 20.1.0
+  - New feature: XPath variables in AttributeSelectors' and xPathExpression AttributeValuess' XPath expressions can now be defined by XACML VariableDefinitions (variable name used as XACML VariableId), which means XACML Variables can be used as XPath variables there.
+  - New feature: fixed a limitation of XACML 3.0 standard `Match` not allowing VariableReferences: AuthzForce Core now supports XACML `VariableReference` equivalents in `Match` elements through special `AttributeDesignators`, i.e. by enabling the new built-in Attribute Provider (`XacmlVariableBasedAttributeProvider` class) with an `attributeProvider` element of the new type `XacmlVarBasedAttributeProviderDescriptor` in PDP configuration, any `AttributeDesignator`s with `Category` matching the `attributeProvider/@category` in PDP configuration is handled as a `VariableReference` and the `AttributeId` is handled as the `VariableId`.
+  - **Changed the PDP configuration XML schema (XSD): refer to [MIGRATION.md](https://github.com/authzforce/core/blob/release-20.1.0/MIGRATION.md) for migrating your PDP configurations (e.g. `pdp.xml`) to the new schema**.
+
+- Upgraded parent project (authzforce-ce-parent) to 8.2.1
+
+### Fixed
+- NullPointerException when log level is DEBUG
+- CVEs
+
+### Added
+- Support for extra XML namespace declaration (xmlns:prefix="URI") not handled by JAXB but required for XPath expression (e.g. AttributeSelector) evaluation, in order to fix issue authzforce/server#66
+- Dependency Apache CXF cxf-core v3.5.0 for StAX utils
+- Attribute Provider (`NamedAttributeProvider`) interface: added new methods for better support of the Multiple Decision Profile (all implemented by default to do nothing):
+    - `beginMultipleDecisionRequest(EvaluationContext mdpContext)`: for special processing in the context of the MDP request (before corresponding Individual Decision requests are evaluated)
+    - `supportsBeginMultipleDecisionRequest()`: indicates whether the Attribute Provider implements `beginMultipleDecisionRequest()` method and therefore needs the PDP engine to call it when a new MDP request is evaluated
+    - `beginIndividualDecisionRequest(EvaluationContext individualDecisionContext, Optional<EvaluationContext> mdpContext)`: for special processing in the context of an Individual Decision request, before it is evaluated against policies (before the `get(attribute)` method is ever called for the individual decision request).
+    - `supportsBeginIndividualDecisionRequest()`: indicates whether the Attribute Provider implements `beginIndividualDecisionRequest()` method and therefore needs the PDP engine to call it when a new individual decision request is evaluated.
+
+
 ## 13.0.2
 ### Fixed
 - CVE-2021-22696 and CVE-2021-3046 fixed by upgrading **authzforce-ce-parent to v8.0.3**
