@@ -3,6 +3,22 @@ All notable changes to this project are documented in this file following the [K
 
 Issues reported on [GitHub](https://github.com/authzforce/core/issues) are referenced in the form of `[GH-N]`, where N is the issue number. Issues reported on [OW2](https://jira.ow2.org/browse/AUTHZFORCE/) are mentioned in the form of `[OW2-N]`, where N is the issue number.
 
+# 15.0.0
+### Changed
+- Upgraded authzforce-ce-parent: 9.1.0:
+  - **Migrated to Java 17** (as the minimum required JRE version from now on) and **JAXB 4.0.0** (javax.xml.bind packages replaced with jakarta.xml.bind)
+- Upgraded dependencies: 
+  - authzforce-ce-core-pap-api: 13.0.0
+  - authzforce-ce-core-pdp-engine: 21.0.1:
+    - Fixed [GH-69](https://github.com/authzforce/core/issues/69): Support for XACML <StatusDetail> / <MissingAttributeDetail>s, returned when missing named Attribute(s) in AttributeDesignator/AttributeSelector expressions, and may be returned by custom PDP extensions as well. 
+    - Fixed [GH-73](https://github.com/authzforce/core/issues/73): (Rule's Condition that always returns False was considered invalid).
+    - Fixed [GH-83](https://github.com/authzforce/core/issues/83): `NoSuchElementException` thrown when the rule combining algorithm is permit-unless-deny and there is no Deny rule but at least one Permit rule with Obligation/Advice.
+    - Fixed [GH-92](https://github.com/authzforce/core/issues/92) Deny-overrides rule combining algorithm - Missing obligations in case of multiple Permit Rules and no Deny Rule (only the Obligations from the first Permit Rule were returned).
+    
+  - authzforce-ce-core-pdp-io-xacml-json: 21.0.1,
+  - java-uuid-generator: 4.2.0,
+  - cxf-core: 4.0.3
+
 
 ## 14.0.0
 ### Changed
