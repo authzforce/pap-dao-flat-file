@@ -271,7 +271,7 @@ public final class FlatFileDAOUtils
 
 	/**
 	 * Copy a directory recursively to another (does not follow links)
-	 * 
+	 * <p>
 	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not the case so far.
 	 * 
 	 * @param source
@@ -292,7 +292,7 @@ public final class FlatFileDAOUtils
 
 	/**
 	 * Delete a directory recursively
-	 * 
+	 * <p>
 	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not the case so far.
 	 * 
 	 * @param dir
