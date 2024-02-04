@@ -3,7 +3,7 @@
    <parent>
       <groupId>org.ow2.authzforce</groupId>
       <artifactId>authzforce-ce-parent</artifactId>
-      <version>8.2.1</version>
+      <version>9.1.0</version>
    </parent>
    <artifactId>authzforce-ce-pap-dao-flat-file</artifactId>
    <!-- Version must be >= authzforce-ce-core-pap-api dependency -->
@@ -19,7 +19,7 @@
       <url>${git.url.base}/pap-dao-flat-file</url>
    </scm>
    <properties>
-      <authzforce-ce.core.version>20.1.0</authzforce-ce.core.version>
+      <authzforce-ce.core.version>21.0.1</authzforce-ce.core.version>
    </properties>
    <repositories>
       <repository>
@@ -33,13 +33,13 @@
       <dependency>
          <groupId>com.fasterxml.uuid</groupId>
          <artifactId>java-uuid-generator</artifactId>
-         <version>4.0.1</version>
+         <version>4.2.0</version>
       </dependency>
       <!-- AuthZForce dependencies -->
       <dependency>
          <groupId>${project.groupId}</groupId>
          <artifactId>authzforce-ce-core-pap-api</artifactId>
-         <version>12.0.0</version>
+         <version>13.0.0</version>
       </dependency>
       <dependency>
          <groupId>${project.groupId}</groupId>
@@ -56,32 +56,29 @@
          <artifactId>cxf-core</artifactId>
          <version>${cxf.version}</version>
       </dependency>
-      <dependency>
-         <groupId>com.github.spotbugs</groupId>
-         <artifactId>spotbugs-annotations</artifactId>
-         <version>4.6.0</version>
-      </dependency>
    </dependencies>
    <build>
       <plugins>
          <plugin>
-            <groupId>org.jvnet.jaxb2.maven2</groupId>
-            <artifactId>maven-jaxb2-plugin</artifactId>
+            <groupId>org.jvnet.jaxb</groupId>
+            <artifactId>jaxb-maven-plugin</artifactId>
             <configuration>
-               <!-- debug=true will generate JAXBDebug class. More info: https://github.com/highsource/maven-jaxb2-plugin/wiki/Miscellaneous -->
-               <debug>false</debug>
-               <strict>false</strict>
+               <specVersion>4.0.2</specVersion>
                <verbose>false</verbose>
                <removeOldOutput>true</removeOldOutput>
                <extension>true</extension>
+               <strict>false</strict>
                <args>
                   <arg>-Xvalue-constructor</arg>
                </args>
                <plugins>
+                  <!-- https://github.com/highsource/jaxb-tools/wiki/Using-JAXB2-Basics-Plugins#using-jaxb-plugins-with-maven -->
+                  <!-- https://github.com/highsource/jaxb-tools/wiki/JAXB-Tools-Migration-Guide#migration-from-v2-to-v3 -->
+                  <!-- Plugin required for -XtoString, -XsimpleEquals -->
                   <plugin>
-                     <groupId>org.jvnet.jaxb2_commons</groupId>
-                     <artifactId>jaxb2-value-constructor</artifactId>
-                     <version>${jaxb2-value-constructor.version}</version>
+                     <groupId>org.jvnet.jaxb</groupId>
+                     <artifactId>jaxb-plugins</artifactId>
+                     <version>${jaxb-plugins.version}</version>
                   </plugin>
                </plugins>
                <useDependenciesAsEpisodes>false</useDependenciesAsEpisodes>
@@ -91,27 +88,24 @@
                      <artifactId>${artifactId.prefix}-pdp-ext-model</artifactId>
                   </episode>
                </episodes>
-               <catalog>src/main/jaxb/catalog.xml</catalog>
                <bindingDirectory>src/main/jaxb</bindingDirectory>
                <bindingIncludes>
                   <include>bindings.xjb</include>
                </bindingIncludes>
+               <catalog>src/main/jaxb/catalog.xml</catalog>
+               <schemaDirectory>src/main/resources</schemaDirectory>
+               <generatePackage>${project.groupId}.pap.dao.flatfile.xmlns</generatePackage>
             </configuration>
             <executions>
                <execution>
-                  <id>jaxb-generate-compile-sources</id>
                   <phase>generate-sources</phase>
                   <goals>
                      <goal>generate</goal>
                   </goals>
-                  <configuration>
-                     <schemaDirectory>src/main/resources</schemaDirectory>
-                     <generatePackage>${project.groupId}.pap.dao.flatfile.xmlns</generatePackage>
-                     <!-- <addCompileSourceRoot>true</addCompileSourceRoot> -->
-                  </configuration>
                </execution>
             </executions>
          </plugin>
+
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-pmd-plugin</artifactId>
