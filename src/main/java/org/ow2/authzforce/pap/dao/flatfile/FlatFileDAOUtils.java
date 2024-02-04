@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2022 THALES.
+ * Copyright (C) 2012-2024 THALES.
  *
  * This file is part of AuthzForce CE.
  *
@@ -28,7 +28,7 @@ import org.ow2.authzforce.core.pdp.api.policy.PolicyVersion;
 import org.ow2.authzforce.core.pdp.impl.policy.PolicyVersions;
 import org.ow2.authzforce.xacml.Xacml3JaxbHelper;
 
-import javax.xml.bind.JAXBException;
+import jakarta.xml.bind.JAXBException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -271,7 +271,7 @@ public final class FlatFileDAOUtils
 
 	/**
 	 * Copy a directory recursively to another (does not follow links)
-	 * 
+	 * <p>
 	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not the case so far.
 	 * 
 	 * @param source
@@ -292,7 +292,7 @@ public final class FlatFileDAOUtils
 
 	/**
 	 * Delete a directory recursively
-	 * 
+	 * <p>
 	 * We could use commons-io library for this, if it were using the new java.nio.file API available since Java 7, not the case so far.
 	 * 
 	 * @param dir

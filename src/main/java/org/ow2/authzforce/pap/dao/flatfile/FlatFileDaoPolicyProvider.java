@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2022 THALES.
+ * Copyright (C) 2012-2024 THALES.
  *
  * This file is part of AuthzForce CE.
  *
@@ -33,7 +33,7 @@ import org.ow2.authzforce.pap.dao.flatfile.xmlns.StaticFlatFileDaoPolicyProvider
 import org.ow2.authzforce.xacml.identifiers.XacmlStatusCode;
 import org.springframework.util.ResourceUtils;
 
-import javax.xml.bind.JAXBException;
+import jakarta.xml.bind.JAXBException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
